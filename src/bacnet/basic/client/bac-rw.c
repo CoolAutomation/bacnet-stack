@@ -218,6 +218,19 @@ static void bacnet_read_property_ack_process(
         }
         apdu = rp_data->application_data;
         apdu_len = rp_data->application_data_len;
+
+        if((rp_data->error_code == ERROR_CODE_SUCCESS) && (apdu_len == 0)) {
+            /* maybe it's an empty list? */
+            value = &Target_Decoded_Property_Value;
+            if (bacnet_is_closing_tag(apdu, 1)) {
+                value->tag = BACNET_APPLICATION_TAG_EMPTYLIST;
+                rp_data->error_class = ERROR_CLASS_SERVICES;
+                rp_data->error_code = ERROR_CODE_SUCCESS;
+                if (bacnet_read_write_value_callback) {
+                    bacnet_read_write_value_callback(device_id, rp_data, value);
+                }
+            }
+        }
         while (apdu_len) {
             value = &Target_Decoded_Property_Value;
             len = bacapp_decode_known_property(
