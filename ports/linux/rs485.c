@@ -387,6 +387,9 @@ void RS485_Send_Frame(
         } else {
             /* wait until all output has been transmitted. */
             tcdrain(RS485_Handle);
+            /* HACK for /dev/pts */
+            usleep(nbytes * 1040);
+            usleep(5 * 1040);
         }
         /*  tcdrain(RS485_Handle); */
         /* per MSTP spec, sort of */
@@ -413,6 +416,9 @@ void RS485_Send_Frame(
         } else {
             /* wait until all output has been transmitted. */
             tcdrain(poSharedData->RS485_Handle);
+            /* HACK for /dev/pts */
+            usleep(nbytes * 1040);
+            usleep(5 * 1040);
         }
         /*  tcdrain(RS485_Handle); */
         /* per MSTP spec, sort of */
