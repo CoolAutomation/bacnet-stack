@@ -640,7 +640,8 @@ void dlenv_init(void)
             bvlc_set_global_address_for_nat(&addr);
         }
     }
-#elif defined(BACDL_MSTP)
+#endif
+#if defined(BACDL_MSTP)
     pEnv = getenv("BACNET_MAX_INFO_FRAMES");
     if (pEnv) {
         dlmstp_set_max_info_frames(strtol(pEnv, NULL, 0));
