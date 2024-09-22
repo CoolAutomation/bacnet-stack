@@ -66,7 +66,7 @@ typedef struct target_data_t {
 #define TARGET_DATA_QUEUE_SIZE (sizeof(struct target_data_t))
 /* count must be a power of 2 for ringbuf library */
 #ifndef TARGET_DATA_QUEUE_COUNT
-#define TARGET_DATA_QUEUE_COUNT 8
+#define TARGET_DATA_QUEUE_COUNT 128
 #endif
 static TARGET_DATA Target_Data_Buffer[TARGET_DATA_QUEUE_COUNT];
 static RING_BUFFER Target_Data_Queue;
