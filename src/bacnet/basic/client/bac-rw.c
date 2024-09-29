@@ -191,9 +191,22 @@ static void My_I_Am_Bind(
 static void
 MyWritePropertySimpleAckHandler(BACNET_ADDRESS *src, uint8_t invoke_id)
 {
+    TARGET_DATA *target;
+    BACNET_READ_PROPERTY_DATA rp_data;
+
     if (address_match(&Target_Address, src) &&
         (invoke_id == Request_Invoke_ID)) {
-        /* nothing to do */
+        target = (TARGET_DATA *)Ringbuf_Peek(&Target_Data_Queue);
+        if (bacnet_read_write_value_callback) {
+            rp_data.error_class = ERROR_CLASS_SERVICES;
+            rp_data.error_code = ERROR_CODE_SUCCESS;
+            rp_data.object_type = target->object_type;
+            rp_data.object_instance = target->object_instance;
+            rp_data.object_property = target->object_property;
+            rp_data.array_index = target->array_index;
+            bacnet_read_write_value_callback(
+                target->device_id, &rp_data, NULL);
+        }
     }
 }
 
