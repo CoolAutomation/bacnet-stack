@@ -35,12 +35,14 @@ typedef void (*bacnet_read_write_value_callback_t)(
  * @param max_apdu [in] maximum APDU size
  * @param segmentation [in] segmentation flag
  * @param vendor_id [in] vendor identifier
+ * @param device_address [in] full device address
  */
 typedef void (*bacnet_read_write_device_callback_t)(
     uint32_t device_instance,
     unsigned max_apdu,
     int segmentation,
-    uint16_t vendor_id);
+    uint16_t vendor_id,
+    BACNET_ADDRESS *device_address);
 
 #ifdef __cplusplus
 extern "C" {
