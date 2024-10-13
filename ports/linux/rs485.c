@@ -284,7 +284,9 @@ void RS485_Send_Frame(
     baud = RS485_Get_Baud_Rate();
     /* sleeping for turnaround time is necessary to give other devices
        time to change from sending to receiving state. */
+    fprintf(stderr, "silencetimer: before %d\n", mstp_port->SilenceTimer((void *)mstp_port));
     usleep(turnaround_time_usec / baud);
+    fprintf(stderr, "silencetimer: after %d\n", mstp_port->SilenceTimer((void *)mstp_port));
     /*
        On  success,  the  number of bytes written are returned (zero
        indicates nothing was written).  On error, -1  is  returned,  and
