@@ -29,7 +29,7 @@
 
 /* number of demo objects */
 #ifndef MAX_TREND_LOGS
-#define MAX_TREND_LOGS 8
+#define MAX_TREND_LOGS 30
 #endif
 
 static TL_DATA_REC Logs[MAX_TREND_LOGS][TL_MAX_ENTRIES];
