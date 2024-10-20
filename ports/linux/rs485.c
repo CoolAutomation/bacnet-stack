@@ -41,6 +41,7 @@
 
 #include <sys/select.h>
 #include <sys/time.h>
+#include "timing-debug.h"
 
 /* Posix serial programming reference:
 http://www.easysw.com/~mike/serial/serial.html */
@@ -266,36 +267,6 @@ bool RS485_Set_Baud_Rate(uint32_t baud)
     return valid;
 }
 
-static void DumpHexTx(const void* data, size_t size) {
-       char ascii[17];
-       size_t i, j;
-       ascii[16] = '\0';
-       fprintf(stderr, "TX:");
-       for (i = 0; i < size; ++i) {
-               fprintf(stderr,"%02X ", ((unsigned char*)data)[i]);
-               if (((unsigned char*)data)[i] >= ' ' && ((unsigned char*)data)[i] <= '~') {
-                       ascii[i % 16] = ((unsigned char*)data)[i];
-               } else {
-                       ascii[i % 16] = '.';
-               }
-               if ((i+1) % 8 == 0 || i+1 == size) {
-                       fprintf(stderr," ");
-                       if ((i+1) % 16 == 0) {
-                               fprintf(stderr,"|  %s \n", ascii);
-                       } else if (i+1 == size) {
-                               ascii[(i+1) % 16] = '\0';
-                               if ((i+1) % 16 <= 8) {
-                                       fprintf(stderr," ");
-                               }
-                               for (j = (i+1) % 16; j < 16; ++j) {
-                                       fprintf(stderr,"   ");
-                               }
-                               fprintf(stderr,"|  %s \n", ascii);
-                       }
-               }
-       }
-}
-
 /****************************************************************************
  * DESCRIPTION: Transmit a frame on the wire
  * RETURN:      none
@@ -314,9 +285,11 @@ void RS485_Send_Frame(
     baud = RS485_Get_Baud_Rate();
     /* sleeping for turnaround time is necessary to give other devices
        time to change from sending to receiving state. */
-    fprintf(stderr, "TX Wait Turnaround Time Start silencetimer %d\n", mstp_port->SilenceTimer((void *)mstp_port));
+    fprintf_curtime(stderr, "TX Wait Turnaround Time Start silencetimer %d\n", mstp_port->SilenceTimer((void *)mstp_port));
+    set_gpio(1);  // Set to HIGH
     usleep(turnaround_time_usec / baud);
-    fprintf(stderr, "TX Wait Turnaround Time Finish silencetimer %d\n", mstp_port->SilenceTimer((void *)mstp_port));
+    set_gpio(0);  // Set to HIGH
+    fprintf_curtime(stderr, "TX Wait Turnaround Time Finish silencetimer %d\n", mstp_port->SilenceTimer((void *)mstp_port));
     /*
        On  success,  the  number of bytes written are returned (zero
        indicates nothing was written).  On error, -1  is  returned,  and
@@ -325,15 +298,22 @@ void RS485_Send_Frame(
        causing any other effect.  For a special file, the results are not
        portable.
      */
-    fprintf(stderr, "TX Start\n");
+    fprintf_curtime(stderr, "TX Start [sz=%d]\n", nbytes);
+
+    set_gpio(1);
     written = write(RS485_Handle, buffer, nbytes);
+    set_gpio(0);
     greska = errno;
     if (written <= 0) {
         printf("write error: %s\n", strerror(greska));
     } else {
         /* wait until all output has been transmitted. */
         tcdrain(RS485_Handle);
-        fprintf(stderr, "TX Finish\n");
+        /* FIXME: it's required only for liner PTS485 (/dev/pts/x) */
+        set_gpio(1);
+        usleep( nbytes * ((1000000UL / baud) * 10) );
+        set_gpio(0);
+        fprintf_curtime(stderr, "TX Finish\n");
     }
     /*  tcdrain(RS485_Handle); */
     /* per MSTP spec, sort of */
@@ -341,36 +321,6 @@ void RS485_Send_Frame(
         mstp_port->SilenceTimerReset((void *)mstp_port);
     }
     return;
-}
-
-static void DumpHexRx(const void* data, size_t size) {
-       char ascii[17];
-       size_t i, j;
-       ascii[16] = '\0';
-       fprintf(stderr, "RX:");
-       for (i = 0; i < size; ++i) {
-               fprintf(stderr,"%02X ", ((unsigned char*)data)[i]);
-               if (((unsigned char*)data)[i] >= ' ' && ((unsigned char*)data)[i] <= '~') {
-                       ascii[i % 16] = ((unsigned char*)data)[i];
-               } else {
-                       ascii[i % 16] = '.';
-               }
-               if ((i+1) % 8 == 0 || i+1 == size) {
-                       fprintf(stderr," ");
-                       if ((i+1) % 16 == 0) {
-                               fprintf(stderr,"|  %s \n", ascii);
-                       } else if (i+1 == size) {
-                               ascii[(i+1) % 16] = '\0';
-                               if ((i+1) % 16 <= 8) {
-                                       fprintf(stderr," ");
-                               }
-                               for (j = (i+1) % 16; j < 16; ++j) {
-                                       fprintf(stderr,"   ");
-                               }
-                               fprintf(stderr,"|  %s \n", ascii);
-                       }
-               }
-       }
 }
 
 /****************************************************************************
@@ -414,8 +364,10 @@ void RS485_Check_UART_Data(struct mstp_port_struct_t *mstp_port)
         return;
     }
     if (FD_ISSET(RS485_Handle, &input)) {
+        fprintf_curtime(stderr, "RX\n");
+        set_gpio(1);  // Set to HIGH
         n = read(RS485_Handle, buf, sizeof(buf));
-        DumpHexRx(buf, n);
+        set_gpio(0);  // Set to LOW
         FIFO_Add(&Rx_FIFO, &buf[0], n);
     }
 }
@@ -509,6 +461,8 @@ void RS485_Initialize(void)
     tcflush(RS485_Handle, TCIOFLUSH);
     /* ringbuffer */
     FIFO_Init(&Rx_FIFO, Rx_Buffer, sizeof(Rx_Buffer));
+
+    init_gpio();
 }
 
 /* Print in a format for Wireshark ExtCap */
