@@ -178,6 +178,13 @@ static void My_I_Am_Bind(
                 }
             }
         }
+        else
+        {
+            if (bacnet_read_write_device_callback) {
+                bacnet_read_write_device_callback(
+                    device_id, max_apdu, segmentation, vendor_id, src);
+            }
+        }
     }
 
     return;
