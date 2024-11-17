@@ -32,8 +32,10 @@ void bip_dl_debug_disable(void);
 BACNET_STACK_EXPORT
 int dlenv_register_as_foreign_device(void);
 
+#if (BACNET_PROTOCOL_REVISION >= 17)
 BACNET_STACK_EXPORT
 void dlenv_network_port_init(void);
+#endif
 
 BACNET_STACK_EXPORT
 void dlenv_maintenance_timer(uint16_t elapsed_seconds);
