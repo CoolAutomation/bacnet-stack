@@ -84,7 +84,9 @@ option(
   "build with uci"
   OFF)
 
-set(BACNET_PROTOCOL_REVISION 19)
+if(NOT BACNET_PROTOCOL_REVISION)
+  set(BACNET_PROTOCOL_REVISION 19)
+endif()
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
