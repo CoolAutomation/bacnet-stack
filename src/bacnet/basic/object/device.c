@@ -1733,14 +1733,6 @@ bool Device_Write_Property_Local(BACNET_WRITE_PROPERTY_DATA *wp_data)
                 apdu_timeout_set((uint16_t)value.type.Unsigned_Int);
             }
             break;
-        case PROP_VENDOR_IDENTIFIER:
-            status = write_property_type_valid(
-                wp_data, &value, BACNET_APPLICATION_TAG_UNSIGNED_INT);
-            if (status) {
-                /* FIXME: bounds check? */
-                Device_Set_Vendor_Identifier((uint16_t)value.type.Unsigned_Int);
-            }
-            break;
         case PROP_SYSTEM_STATUS:
             status = write_property_type_valid(
                 wp_data, &value, BACNET_APPLICATION_TAG_ENUMERATED);
@@ -1797,15 +1789,6 @@ bool Device_Write_Property_Local(BACNET_WRITE_PROPERTY_DATA *wp_data)
                 wp_data, &value, MAX_DEV_DESC_LEN);
             if (status) {
                 Device_Set_Description(
-                    characterstring_value(&value.type.Character_String),
-                    characterstring_length(&value.type.Character_String));
-            }
-            break;
-        case PROP_MODEL_NAME:
-            status = write_property_empty_string_valid(
-                wp_data, &value, MAX_DEV_MOD_LEN);
-            if (status) {
-                Device_Set_Model_Name(
                     characterstring_value(&value.type.Character_String),
                     characterstring_length(&value.type.Character_String));
             }
