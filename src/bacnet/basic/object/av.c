@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief A basic BACnet Analog Input Object implementation.
+ * @brief A basic BACnet Analog Value Object implementation.
  * An analog value object is an I/O object with a present-value that
  * uses an single precision floating point data type.
  * @author Steve Karg <skarg@users.sourceforge.net>
@@ -43,6 +43,7 @@ static const int Analog_Value_Properties_Required[] = {
 
 static const int Analog_Value_Properties_Optional[] = {
     PROP_DESCRIPTION, PROP_RELIABILITY, PROP_COV_INCREMENT,
+    PROP_PRIORITY_ARRAY, PROP_RELINQUISH_DEFAULT,
 #if defined(INTRINSIC_REPORTING)
     PROP_TIME_DELAY, PROP_NOTIFICATION_CLASS, PROP_HIGH_LIMIT,
     PROP_LOW_LIMIT, PROP_DEADBAND, PROP_LIMIT_ENABLE, PROP_EVENT_ENABLE,
@@ -163,14 +164,117 @@ unsigned Analog_Value_Instance_To_Index(uint32_t object_instance)
 float Analog_Value_Present_Value(uint32_t object_instance)
 {
     float value = 0.0f;
+    uint8_t priority = 0; /* loop counter */
     struct analog_value_descr *pObject;
 
-    pObject = Analog_Value_Object(object_instance);
+    pObject = Keylist_Data(Object_List, object_instance);
     if (pObject) {
-        value = pObject->Present_Value;
+        value = Analog_Value_Relinquish_Default(object_instance);
+        for (priority = 0; priority < BACNET_MAX_PRIORITY; priority++) {
+            if (!pObject->Relinquished[priority]) {
+                value = pObject->Priority_Array[priority];
+                break;
+            }
+        }
     }
 
     return value;
+}
+
+/**
+ * @brief For a given object instance-number, determines the priority
+ * @param  object_instance - object-instance number of the object
+ * @return  active priority 1..16, or 0 if no priority is active
+ */
+unsigned Analog_Value_Present_Value_Priority(uint32_t object_instance)
+{
+    unsigned p = 0; /* loop counter */
+    unsigned priority = 0; /* return value */
+    struct analog_value_descr *pObject;
+
+    pObject = Keylist_Data(Object_List, object_instance);
+    if (pObject) {
+        for (p = 0; p < BACNET_MAX_PRIORITY; p++) {
+            if (!pObject->Relinquished[p]) {
+                priority = p + 1;
+                break;
+            }
+        }
+    }
+
+    return priority;
+}
+
+/**
+ * @brief Encode a BACnetARRAY property element
+ * @param object_instance [in] BACnet network port object instance number
+ * @param index [in] array index requested:
+ *    0 to N for individual array members
+ * @param apdu [out] Buffer in which the APDU contents are built, or NULL to
+ * return the length of buffer if it had been built
+ * @return The length of the apdu encoded or
+ *   BACNET_STATUS_ERROR for ERROR_CODE_INVALID_ARRAY_INDEX
+ */
+static int Analog_Value_Priority_Array_Encode(
+    uint32_t object_instance, BACNET_ARRAY_INDEX index, uint8_t *apdu)
+{
+    int apdu_len = BACNET_STATUS_ERROR;
+    struct analog_value_descr *pObject;
+    float real_value;
+
+    pObject = Keylist_Data(Object_List, object_instance);
+    if (pObject && (index < BACNET_MAX_PRIORITY)) {
+        if (pObject->Relinquished[index]) {
+            apdu_len = encode_application_null(apdu);
+        } else {
+            real_value = pObject->Priority_Array[index];
+            apdu_len = encode_application_real(apdu, real_value);
+        }
+    }
+
+    return apdu_len;
+}
+
+/**
+ * For a given object instance-number, determines the relinquish-default value
+ *
+ * @param object_instance - object-instance number
+ *
+ * @return relinquish-default value of the object
+ */
+float Analog_Value_Relinquish_Default(uint32_t object_instance)
+{
+    float value = 0.0;
+    struct analog_value_descr *pObject;
+
+    pObject = Keylist_Data(Object_List, object_instance);
+    if (pObject) {
+        value = pObject->Relinquish_Default;
+    }
+
+    return value;
+}
+
+/**
+ * For a given object instance-number, sets the relinquish-default value
+ *
+ * @param  object_instance - object-instance number of the object
+ * @param  value - floating point analog value relinquish-default value
+ *
+ * @return  true if values are within range and relinquish-default value is set.
+ */
+bool Analog_Value_Relinquish_Default_Set(uint32_t object_instance, float value)
+{
+    bool status = false;
+    struct analog_value_descr *pObject;
+
+    pObject = Keylist_Data(Object_List, object_instance);
+    if (pObject) {
+        pObject->Relinquish_Default = value;
+        status = true;
+    }
+
+    return status;
 }
 
 /**
@@ -221,12 +325,144 @@ bool Analog_Value_Present_Value_Set(
     bool status = false;
     struct analog_value_descr *pObject;
 
-    (void)priority;
-    pObject = Analog_Value_Object(object_instance);
+    pObject = Keylist_Data(Object_List, object_instance);
     if (pObject) {
-        Analog_Value_COV_Detect(pObject, value);
-        pObject->Present_Value = value;
-        status = true;
+        if ((priority >= 1) && (priority <= BACNET_MAX_PRIORITY)) {
+            pObject->Relinquished[priority - 1] = false;
+            pObject->Priority_Array[priority - 1] = value;
+            Analog_Value_COV_Detect(
+                pObject, Analog_Value_Present_Value(object_instance));
+        }
+    }
+
+    return status;
+}
+
+/**
+ * @brief For a given object instance-number, relinquishes the present-value
+ * @param  object_instance - object-instance number of the object
+ * @param  priority - priority-array index value 1..16
+ * @return  true if present-value is relinquished.
+ */
+bool Analog_Value_Present_Value_Relinquish(
+    uint32_t object_instance, unsigned priority)
+{
+    bool status = false;
+    struct analog_value_descr *pObject;
+
+    pObject = Keylist_Data(Object_List, object_instance);
+    if (pObject) {
+        if ((priority >= 1) && (priority <= BACNET_MAX_PRIORITY)) {
+            pObject->Relinquished[priority - 1] = true;
+            pObject->Priority_Array[priority - 1] = 0.0;
+            Analog_Value_COV_Detect(
+                pObject, Analog_Value_Present_Value(object_instance));
+            status = true;
+        }
+    }
+
+    return status;
+}
+
+/**
+ * @brief For a given object instance-number, writes the present-value to the
+ * remote node
+ * @param  object_instance - object-instance number of the object
+ * @param  value - floating point analog value
+ * @param  priority - priority-array index value 1..16
+ * @param  error_class - the BACnet error class
+ * @param  error_code - BACnet Error code
+ * @return  true if present-value is set.
+ */
+static bool Analog_Value_Present_Value_Write(
+    uint32_t object_instance,
+    float value,
+    uint8_t priority,
+    BACNET_ERROR_CLASS *error_class,
+    BACNET_ERROR_CODE *error_code)
+{
+    bool status = false;
+    struct analog_value_descr *pObject;
+    float old_value = 0.0;
+    float new_value = 0.0;
+
+    pObject = Keylist_Data(Object_List, object_instance);
+    if (pObject) {
+        if ((priority >= 1) && (priority <= BACNET_MAX_PRIORITY) ) {
+            if (priority != 6) {
+                old_value = Analog_Value_Present_Value(object_instance);
+                Analog_Value_Present_Value_Set(
+                    object_instance, value, priority);
+                if (pObject->Out_Of_Service) {
+                    /* The physical point that the object represents
+                        is not in service. This means that changes to the
+                        Present_Value property are decoupled from the
+                        physical output when the value of Out_Of_Service
+                        is true. */
+                }
+                status = true;
+            } else {
+                *error_class = ERROR_CLASS_PROPERTY;
+                *error_code = ERROR_CODE_WRITE_ACCESS_DENIED;
+            }
+        } else {
+            *error_class = ERROR_CLASS_PROPERTY;
+            *error_code = ERROR_CODE_VALUE_OUT_OF_RANGE;
+        }
+    } else {
+        *error_class = ERROR_CLASS_OBJECT;
+        *error_code = ERROR_CODE_UNKNOWN_OBJECT;
+    }
+
+    return status;
+}
+
+/**
+ * @brief For a given object instance-number, writes the present-value to the
+ * remote node
+ * @param  object_instance - object-instance number of the object
+ * @param  priority - priority-array index value 1..16
+ * @param  error_class - the BACnet error class
+ * @param  error_code - BACnet Error code
+ * @return  true if write is requested
+ */
+static bool Analog_Value_Present_Value_Relinquish_Write(
+    uint32_t object_instance,
+    uint8_t priority,
+    BACNET_ERROR_CLASS *error_class,
+    BACNET_ERROR_CODE *error_code)
+{
+    bool status = false;
+    struct analog_value_descr *pObject;
+    float old_value = 0.0;
+    float new_value = 0.0;
+
+    pObject = Keylist_Data(Object_List, object_instance);
+    if (pObject) {
+        if ((priority >= 1) && (priority <= BACNET_MAX_PRIORITY)) {
+            if (priority != 6) {
+                old_value = Analog_Value_Present_Value(object_instance);
+                Analog_Value_Present_Value_Relinquish(
+                    object_instance, priority);
+                if (pObject->Out_Of_Service) {
+                    /* The physical point that the object represents
+                        is not in service. This means that changes to the
+                        Present_Value property are decoupled from the
+                        physical output when the value of Out_Of_Service
+                        is true. */
+                }
+                status = true;
+            } else {
+                *error_class = ERROR_CLASS_PROPERTY;
+                *error_code = ERROR_CODE_WRITE_ACCESS_DENIED;
+            }
+        } else {
+            *error_class = ERROR_CLASS_PROPERTY;
+            *error_code = ERROR_CODE_VALUE_OUT_OF_RANGE;
+        }
+    } else {
+        *error_class = ERROR_CLASS_OBJECT;
+        *error_code = ERROR_CODE_UNKNOWN_OBJECT;
     }
 
     return status;
@@ -463,7 +699,7 @@ bool Analog_Value_Encode_Value_List(
             fault = true;
         }
         out_of_service = pObject->Out_Of_Service;
-        present_value = pObject->Present_Value;
+        present_value = Analog_Value_Present_Value(object_instance);
         status = cov_value_list_encode_real(
             value_list, present_value, in_alarm, fault, overridden,
             out_of_service);
@@ -502,7 +738,8 @@ void Analog_Value_COV_Increment_Set(uint32_t object_instance, float value)
     pObject = Analog_Value_Object(object_instance);
     if (pObject) {
         pObject->COV_Increment = value;
-        Analog_Value_COV_Detect(pObject, pObject->Present_Value);
+        Analog_Value_COV_Detect(
+            pObject, Analog_Value_Present_Value(object_instance));
     }
 }
 
@@ -650,9 +887,7 @@ int Analog_Value_Read_Property(BACNET_READ_PROPERTY_DATA *rpdata)
     float real_value = (float)1.414;
     uint8_t *apdu = NULL;
     ANALOG_VALUE_DESCR *CurrentAV;
-#if defined(INTRINSIC_REPORTING)
     int apdu_size = 0;
-#endif
 
     /* Valid data? */
     if (rpdata == NULL) {
@@ -669,9 +904,7 @@ int Analog_Value_Read_Property(BACNET_READ_PROPERTY_DATA *rpdata)
         return BACNET_STATUS_ERROR;
     }
     apdu = rpdata->application_data;
-#if defined(INTRINSIC_REPORTING)
     apdu_size = rpdata->application_data_len;
-#endif
     switch (rpdata->object_property) {
         case PROP_OBJECT_IDENTIFIER:
             apdu_len = encode_application_object_id(
@@ -720,6 +953,24 @@ int Analog_Value_Read_Property(BACNET_READ_PROPERTY_DATA *rpdata)
         case PROP_UNITS:
             apdu_len =
                 encode_application_enumerated(&apdu[0], CurrentAV->Units);
+            break;
+        case PROP_PRIORITY_ARRAY:
+            apdu_len = bacnet_array_encode(
+                rpdata->object_instance, rpdata->array_index,
+                Analog_Value_Priority_Array_Encode, BACNET_MAX_PRIORITY, apdu,
+                apdu_size);
+            if (apdu_len == BACNET_STATUS_ABORT) {
+                rpdata->error_code =
+                    ERROR_CODE_ABORT_SEGMENTATION_NOT_SUPPORTED;
+            } else if (apdu_len == BACNET_STATUS_ERROR) {
+                rpdata->error_class = ERROR_CLASS_PROPERTY;
+                rpdata->error_code = ERROR_CODE_INVALID_ARRAY_INDEX;
+            }
+            break;
+        case PROP_RELINQUISH_DEFAULT:
+            real_value =
+                Analog_Value_Relinquish_Default(rpdata->object_instance);
+            apdu_len = encode_application_real(&apdu[0], real_value);
             break;
         case PROP_DESCRIPTION:
             characterstring_init_ansi(
@@ -877,27 +1128,18 @@ bool Analog_Value_Write_Property(BACNET_WRITE_PROPERTY_DATA *wp_data)
             status = write_property_type_valid(
                 wp_data, &value, BACNET_APPLICATION_TAG_REAL);
             if (status) {
-                /* Command priority 6 is reserved for use by Minimum On/Off
-                   algorithm and may not be used for other purposes in any
-                   object. */
-                if (wp_data->priority == 6) {
-                    /* Command priority 6 is reserved for use by Minimum On/Off
-                       algorithm and may not be used for other purposes in any
-                       object. */
-                    wp_data->error_class = ERROR_CLASS_PROPERTY;
-                    wp_data->error_code = ERROR_CODE_WRITE_ACCESS_DENIED;
-                } else if (Analog_Value_Present_Value_Set(
-                               wp_data->object_instance, value.type.Real,
-                               wp_data->priority)) {
-                    status = true;
-                } else {
-                    wp_data->error_class = ERROR_CLASS_PROPERTY;
-                    wp_data->error_code = ERROR_CODE_VALUE_OUT_OF_RANGE;
-                }
+                status = Analog_Value_Present_Value_Write(
+                    wp_data->object_instance, value.type.Real,
+                    wp_data->priority, &wp_data->error_class,
+                    &wp_data->error_code);
             } else {
-                status = false;
-                wp_data->error_class = ERROR_CLASS_PROPERTY;
-                wp_data->error_code = ERROR_CODE_VALUE_OUT_OF_RANGE;
+                status = write_property_type_valid(
+                    wp_data, &value, BACNET_APPLICATION_TAG_NULL);
+                if (status) {
+                    status = Analog_Value_Present_Value_Relinquish_Write(
+                        wp_data->object_instance, wp_data->priority,
+                        &wp_data->error_class, &wp_data->error_code);
+                }
             }
             break;
         case PROP_OUT_OF_SERVICE:
@@ -1626,6 +1868,7 @@ uint32_t Analog_Value_Create(uint32_t object_instance)
 {
     struct analog_value_descr *pObject = NULL;
     int index = 0;
+    unsigned priority = 0;
 #if defined(INTRINSIC_REPORTING)
     unsigned j;
 #endif
@@ -1648,7 +1891,11 @@ uint32_t Analog_Value_Create(uint32_t object_instance)
             pObject->Description = NULL;
             pObject->Reliability = RELIABILITY_NO_FAULT_DETECTED;
             pObject->COV_Increment = 1.0;
-            pObject->Present_Value = 0.0f;
+            for (priority = 0; priority < BACNET_MAX_PRIORITY; priority++) {
+                pObject->Relinquished[priority] = true;
+                pObject->Priority_Array[priority] = 0.0f;
+            }
+            pObject->Relinquish_Default = 0.0f;
             pObject->Prior_Value = 0.0;
             pObject->Units = UNITS_PERCENT;
             pObject->Out_Of_Service = false;

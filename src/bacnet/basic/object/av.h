@@ -2,7 +2,7 @@
  * @file
  * @author Steve Karg
  * @date 2006
- * @brief API for a basic BACnet Analog Input Object implementation.
+ * @brief API for a basic BACnet Analog Value Object implementation.
  * An analog value object is an I/O object with a present-value that
  * uses a single precision floating point data type.
  * @copyright SPDX-License-Identifier: MIT
@@ -29,8 +29,10 @@ typedef struct analog_value_descr {
     unsigned Event_State : 3;
     bool Out_Of_Service;
     uint16_t Units;
-    float Present_Value;
     float Prior_Value;
+    bool Relinquished[BACNET_MAX_PRIORITY];
+    float Priority_Array[BACNET_MAX_PRIORITY];
+    float Relinquish_Default;
     float COV_Increment;
     bool Changed;
     const char *Object_Name;
@@ -88,6 +90,17 @@ bool Analog_Value_Present_Value_Set(
     uint32_t object_instance, float value, uint8_t priority);
 BACNET_STACK_EXPORT
 float Analog_Value_Present_Value(uint32_t object_instance);
+BACNET_STACK_EXPORT
+bool Analog_Value_Present_Value_Relinquish(
+    uint32_t object_instance, unsigned priority);
+BACNET_STACK_EXPORT
+unsigned Analog_Value_Present_Value_Priority(uint32_t object_instance);
+
+BACNET_STACK_EXPORT
+float Analog_Value_Relinquish_Default(uint32_t object_instance);
+BACNET_STACK_EXPORT
+bool Analog_Value_Relinquish_Default_Set(
+    uint32_t object_instance, float value);
 
 BACNET_STACK_EXPORT
 unsigned Analog_Value_Event_State(uint32_t object_instance);
