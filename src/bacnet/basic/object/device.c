@@ -1942,7 +1942,7 @@ static bool Device_Write_Property_Object_Name(
             if ((object_type == wp_data->object_type) &&
                 (object_instance == wp_data->object_instance)) {
                 /* writing same name to same object */
-                status = true;
+                status = Object_Write_Property(wp_data);
             } else {
                 /* name already exists in some object */
                 wp_data->error_class = ERROR_CLASS_PROPERTY;
