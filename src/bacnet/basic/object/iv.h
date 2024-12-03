@@ -53,6 +53,12 @@ BACNET_STACK_EXPORT
 int32_t Integer_Value_Present_Value(uint32_t object_instance);
 
 BACNET_STACK_EXPORT
+int32_t Integer_Value_Relinquish_Default(uint32_t object_instance);
+BACNET_STACK_EXPORT
+bool Integer_Value_Relinquish_Default_Set(
+    uint32_t object_instance, int32_t value);
+
+BACNET_STACK_EXPORT
 bool Integer_Value_Change_Of_Value(uint32_t instance);
 BACNET_STACK_EXPORT
 void Integer_Value_Change_Of_Value_Clear(uint32_t instance);

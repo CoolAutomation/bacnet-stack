@@ -2,8 +2,8 @@
  * @file
  * @author Steve Karg <skarg@users.sourceforge.net>
  * @date 2014
- * @brief The Integer Value object is an object with a present-value that
- * uses an INTEGER data type.
+ * @brief The Positive Integer Value object is an object with a present-value
+ * that uses an INTEGER data type.
  * @copyright SPDX-License-Identifier: MIT
  */
 #include <stdbool.h>
@@ -37,7 +37,9 @@ static const BACNET_OBJECT_TYPE Object_Type = OBJECT_INTEGER_VALUE;
 struct integer_object {
     bool Out_Of_Service : 1;
     bool Changed : 1;
-    int32_t Present_Value;
+    bool Relinquished[BACNET_MAX_PRIORITY];
+    int32_t Priority_Array[BACNET_MAX_PRIORITY];
+    int32_t Relinquish_Default;
     int32_t Prior_Value;
     uint32_t COV_Increment;
     uint16_t Units;
@@ -56,7 +58,12 @@ static const int Integer_Value_Properties_Required[] = { PROP_OBJECT_IDENTIFIER,
                                                          -1 };
 
 static const int Integer_Value_Properties_Optional[] = {
-    PROP_OUT_OF_SERVICE, PROP_DESCRIPTION, PROP_COV_INCREMENT, -1
+    PROP_OUT_OF_SERVICE,
+    PROP_DESCRIPTION,
+    PROP_COV_INCREMENT,
+    PROP_PRIORITY_ARRAY,
+    PROP_RELINQUISH_DEFAULT,
+    -1
 };
 
 static const int Integer_Value_Properties_Proprietary[] = { -1 };
@@ -163,15 +170,22 @@ unsigned Integer_Value_Instance_To_Index(uint32_t object_instance)
 int32_t Integer_Value_Present_Value(uint32_t object_instance)
 {
     int32_t value = 0;
-    struct integer_object *pObject = Integer_Value_Object(object_instance);
+    uint8_t priority = 0; /* loop counter */
+    struct integer_object *pObject;
 
+    pObject = Integer_Value_Object(object_instance);
     if (pObject) {
-        value = pObject->Present_Value;
+        value = Integer_Value_Relinquish_Default(object_instance);
+        for (priority = 0; priority < BACNET_MAX_PRIORITY; priority++) {
+            if (!pObject->Relinquished[priority]) {
+                value = pObject->Priority_Array[priority];
+                break;
+            }
+        }
     }
 
     return value;
 }
-
 /**
  * This function is used to detect a value change,
  * using the new value compared against the prior
@@ -209,18 +223,221 @@ bool Integer_Value_Present_Value_Set(
     uint32_t object_instance, int32_t value, uint8_t priority)
 {
     bool status = false;
-    struct integer_object *pObject = Integer_Value_Object(object_instance);
+    struct integer_object *pObject;
 
-    (void)priority;
-
+    pObject = Integer_Value_Object(object_instance);
     if (pObject) {
-        Integer_Value_COV_Detect(pObject, value);
-        pObject->Present_Value = value;
+        if ((priority >= 1) && (priority <= BACNET_MAX_PRIORITY)) {
+            pObject->Relinquished[priority - 1] = false;
+            pObject->Priority_Array[priority - 1] = value;
+            Integer_Value_COV_Detect(
+                pObject, Integer_Value_Present_Value(object_instance));
+        }
+    }
+
+    return status;
+}
+
+/**
+ * @brief For a given object instance-number, relinquishes the present-value
+ * @param  object_instance - object-instance number of the object
+ * @param  priority - priority-array index value 1..16
+ * @return  true if present-value is relinquished.
+ */
+bool Integer_Value_Present_Value_Relinquish(
+    uint32_t object_instance, unsigned priority)
+{
+    bool status = false;
+    struct integer_object *pObject;
+
+    pObject = Integer_Value_Object(object_instance);
+    if (pObject) {
+        if ((priority >= 1) && (priority <= BACNET_MAX_PRIORITY)) {
+            pObject->Relinquished[priority - 1] = true;
+            pObject->Priority_Array[priority - 1] = 0;
+            Integer_Value_COV_Detect(
+                pObject, Integer_Value_Present_Value(object_instance));
+            status = true;
+        }
+    }
+
+    return status;
+}
+
+/**
+ * @brief For a given object instance-number, writes the present-value to the
+ * remote node
+ * @param  object_instance - object-instance number of the object
+ * @param  value - signed integer value
+ * @param  priority - priority-array index value 1..16
+ * @param  error_class - the BACnet error class
+ * @param  error_code - BACnet Error code
+ * @return  true if present-value is set.
+ */
+static bool Integer_Value_Present_Value_Write(
+    uint32_t object_instance,
+    int32_t value,
+    uint8_t priority,
+    BACNET_ERROR_CLASS *error_class,
+    BACNET_ERROR_CODE *error_code)
+{
+    bool status = false;
+    struct integer_object *pObject;
+    int32_t old_value = 0;
+
+    pObject = Integer_Value_Object(object_instance);
+    if (pObject) {
+        if ((priority >= 1) && (priority <= BACNET_MAX_PRIORITY) ) {
+            if (priority != 6) {
+                old_value = Integer_Value_Present_Value(object_instance);
+                Integer_Value_Present_Value_Set(
+                    object_instance, value, priority);
+                if (pObject->Out_Of_Service) {
+                    /* The physical point that the object represents
+                        is not in service. This means that changes to the
+                        Present_Value property are decoupled from the
+                        physical output when the value of Out_Of_Service
+                        is true. */
+                }
+                status = true;
+            } else {
+                *error_class = ERROR_CLASS_PROPERTY;
+                *error_code = ERROR_CODE_WRITE_ACCESS_DENIED;
+            }
+        } else {
+            *error_class = ERROR_CLASS_PROPERTY;
+            *error_code = ERROR_CODE_VALUE_OUT_OF_RANGE;
+        }
+    } else {
+        *error_class = ERROR_CLASS_OBJECT;
+        *error_code = ERROR_CODE_UNKNOWN_OBJECT;
+    }
+
+    return status;
+}
+
+/**
+ * @brief For a given object instance-number, writes the present-value to the
+ * remote node
+ * @param  object_instance - object-instance number of the object
+ * @param  priority - priority-array index value 1..16
+ * @param  error_class - the BACnet error class
+ * @param  error_code - BACnet Error code
+ * @return  true if write is requested
+ */
+static bool Integer_Value_Present_Value_Relinquish_Write(
+    uint32_t object_instance,
+    uint8_t priority,
+    BACNET_ERROR_CLASS *error_class,
+    BACNET_ERROR_CODE *error_code)
+{
+    bool status = false;
+    struct integer_object *pObject;
+    int32_t old_value = 0;
+
+    pObject = Integer_Value_Object(object_instance);
+    if (pObject) {
+        if ((priority >= 1) && (priority <= BACNET_MAX_PRIORITY)) {
+            if (priority != 6) {
+                old_value = Integer_Value_Present_Value(object_instance);
+                Integer_Value_Present_Value_Relinquish(
+                    object_instance, priority);
+                if (pObject->Out_Of_Service) {
+                    /* The physical point that the object represents
+                        is not in service. This means that changes to the
+                        Present_Value property are decoupled from the
+                        physical output when the value of Out_Of_Service
+                        is true. */
+                }
+                status = true;
+            } else {
+                *error_class = ERROR_CLASS_PROPERTY;
+                *error_code = ERROR_CODE_WRITE_ACCESS_DENIED;
+            }
+        } else {
+            *error_class = ERROR_CLASS_PROPERTY;
+            *error_code = ERROR_CODE_VALUE_OUT_OF_RANGE;
+        }
+    } else {
+        *error_class = ERROR_CLASS_OBJECT;
+        *error_code = ERROR_CODE_UNKNOWN_OBJECT;
+    }
+
+    return status;
+}
+
+/**
+ * @brief Encode a BACnetARRAY property element
+ * @param object_instance [in] BACnet network port object instance number
+ * @param index [in] array index requested:
+ *    0 to N for individual array members
+ * @param apdu [out] Buffer in which the APDU contents are built, or NULL to
+ * return the length of buffer if it had been built
+ * @return The length of the apdu encoded or
+ *   BACNET_STATUS_ERROR for ERROR_CODE_INVALID_ARRAY_INDEX
+ */
+static int Integer_Value_Priority_Array_Encode(
+    uint32_t object_instance, BACNET_ARRAY_INDEX index, uint8_t *apdu)
+{
+    int apdu_len = BACNET_STATUS_ERROR;
+    struct integer_object *pObject;
+    int32_t value;
+
+    pObject = Integer_Value_Object(object_instance);
+    if (pObject && (index < BACNET_MAX_PRIORITY)) {
+        if (pObject->Relinquished[index]) {
+            apdu_len = encode_application_null(apdu);
+        } else {
+            value = pObject->Priority_Array[index];
+            apdu_len = encode_application_signed(apdu, value);
+        }
+    }
+
+    return apdu_len;
+}
+
+/**
+ * For a given object instance-number, determines the relinquish-default value
+ *
+ * @param object_instance - object-instance number
+ *
+ * @return relinquish-default value of the object
+ */
+int32_t Integer_Value_Relinquish_Default(uint32_t object_instance)
+{
+    int32_t value = 0;
+    struct integer_object *pObject;
+
+    pObject = Integer_Value_Object(object_instance);
+    if (pObject) {
+        value = pObject->Relinquish_Default;
+    }
+
+    return value;
+}
+
+/**
+ * For a given object instance-number, sets the relinquish-default value
+ *
+ * @param  object_instance - object-instance number of the object
+ * @param  value - signed integer value relinquish-default value
+ *
+ * @return  true if values are within range and relinquish-default value is set.
+ */
+bool Integer_Value_Relinquish_Default_Set(uint32_t object_instance, int32_t value)
+{
+    bool status = false;
+    struct integer_object *pObject;
+
+    pObject = Integer_Value_Object(object_instance);
+    if (pObject) {
+        pObject->Relinquish_Default = value;
         status = true;
     }
 
     return status;
 }
+
 
 /**
  * For a given object instance-number, loads the object-name into
@@ -461,6 +678,7 @@ int Integer_Value_Read_Property(BACNET_READ_PROPERTY_DATA *rpdata)
     uint32_t units = 0;
     int32_t integer_value = 0;
     bool state = false;
+    int apdu_size = 0;
 
     if ((rpdata == NULL) || (rpdata->application_data == NULL) ||
         (rpdata->application_data_len == 0)) {
@@ -468,6 +686,7 @@ int Integer_Value_Read_Property(BACNET_READ_PROPERTY_DATA *rpdata)
     }
 
     apdu = rpdata->application_data;
+    apdu_size = rpdata->application_data_len;
     switch (rpdata->object_property) {
         case PROP_OBJECT_IDENTIFIER:
             apdu_len = encode_application_object_id(
@@ -510,6 +729,24 @@ int Integer_Value_Read_Property(BACNET_READ_PROPERTY_DATA *rpdata)
         case PROP_UNITS:
             units = Integer_Value_Units(rpdata->object_instance);
             apdu_len = encode_application_enumerated(&apdu[0], units);
+            break;
+        case PROP_PRIORITY_ARRAY:
+            apdu_len = bacnet_array_encode(
+                rpdata->object_instance, rpdata->array_index,
+                Integer_Value_Priority_Array_Encode, BACNET_MAX_PRIORITY, apdu,
+                apdu_size);
+            if (apdu_len == BACNET_STATUS_ABORT) {
+                rpdata->error_code =
+                    ERROR_CODE_ABORT_SEGMENTATION_NOT_SUPPORTED;
+            } else if (apdu_len == BACNET_STATUS_ERROR) {
+                rpdata->error_class = ERROR_CLASS_PROPERTY;
+                rpdata->error_code = ERROR_CODE_INVALID_ARRAY_INDEX;
+            }
+            break;
+        case PROP_RELINQUISH_DEFAULT:
+            integer_value =
+                Integer_Value_Relinquish_Default(rpdata->object_instance);
+            apdu_len = encode_application_signed(&apdu[0], integer_value);
             break;
         case PROP_COV_INCREMENT:
             apdu_len = encode_application_unsigned(
@@ -571,9 +808,18 @@ bool Integer_Value_Write_Property(BACNET_WRITE_PROPERTY_DATA *wp_data)
             status = write_property_type_valid(
                 wp_data, &value, BACNET_APPLICATION_TAG_SIGNED_INT);
             if (status) {
-                Integer_Value_Present_Value_Set(
+                status = Integer_Value_Present_Value_Write(
                     wp_data->object_instance, value.type.Signed_Int,
-                    wp_data->priority);
+                    wp_data->priority, &wp_data->error_class,
+                    &wp_data->error_code);
+            } else {
+                status = write_property_type_valid(
+                    wp_data, &value, BACNET_APPLICATION_TAG_NULL);
+                if (status) {
+                    status = Integer_Value_Present_Value_Relinquish_Write(
+                        wp_data->object_instance, wp_data->priority,
+                        &wp_data->error_class, &wp_data->error_code);
+                }
             }
             break;
         case PROP_COV_INCREMENT:
@@ -673,7 +919,7 @@ bool Integer_Value_Encode_Value_List(
 
     if (pObject) {
         bool out_of_service = pObject->Out_Of_Service;
-        uint32_t present_value = pObject->Present_Value;
+        uint32_t present_value = Integer_Value_Present_Value(object_instance);
         const bool in_alarm = false;
         const bool fault = false;
         const bool overridden = false;
@@ -697,7 +943,8 @@ void Integer_Value_COV_Increment_Set(uint32_t object_instance, uint32_t value)
 
     if (pObject) {
         pObject->COV_Increment = value;
-        Integer_Value_COV_Detect(pObject, pObject->Present_Value);
+        Integer_Value_COV_Detect(
+            pObject, Integer_Value_Present_Value(object_instance));
     }
 }
 
@@ -709,6 +956,7 @@ void Integer_Value_COV_Increment_Set(uint32_t object_instance, uint32_t value)
 uint32_t Integer_Value_Create(uint32_t object_instance)
 {
     struct integer_object *pObject = NULL;
+    unsigned priority = 0;
 
     if (object_instance > BACNET_MAX_INSTANCE) {
         return BACNET_MAX_INSTANCE;
@@ -734,7 +982,11 @@ uint32_t Integer_Value_Create(uint32_t object_instance)
             pObject->Object_Name = NULL;
             pObject->Description = NULL;
             pObject->COV_Increment = 1;
-            pObject->Present_Value = 0;
+            for (priority = 0; priority < BACNET_MAX_PRIORITY; priority++) {
+                pObject->Relinquished[priority] = true;
+                pObject->Priority_Array[priority] = 0;
+            }
+            pObject->Relinquish_Default = 0;
             pObject->Prior_Value = 0;
             pObject->Units = UNITS_PERCENT;
             pObject->Out_Of_Service = false;
