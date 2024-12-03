@@ -27,7 +27,9 @@ struct object_data {
     bool Out_Of_Service : 1;
     bool Change_Of_Value : 1;
     bool Write_Enabled : 1;
-    uint8_t Present_Value;
+    bool Relinquished[BACNET_MAX_PRIORITY];
+    uint8_t Priority_Array[BACNET_MAX_PRIORITY];
+    uint8_t Relinquish_Default;
     uint8_t Reliability;
     const char *Object_Name;
     /* The state text functions expect a list of C strings separated by '\0' */
@@ -54,7 +56,9 @@ static const int Properties_Required[] = {
 };
 
 static const int Properties_Optional[] = { PROP_DESCRIPTION, PROP_STATE_TEXT,
-                                           PROP_RELIABILITY, -1 };
+                                           PROP_RELIABILITY,
+                                           PROP_PRIORITY_ARRAY,
+                                           PROP_RELINQUISH_DEFAULT, -1 };
 
 static const int Properties_Proprietary[] = { -1 };
 
@@ -119,8 +123,8 @@ uint32_t Multistate_Value_Index_To_Instance(unsigned index)
 }
 
 /**
- * @brief Determines the number of Multistate Input objects
- * @return  Number of Multistate Input objects
+ * @brief Determines the number of Multistate Value objects
+ * @return  Number of Multistate Value objects
  */
 unsigned Multistate_Value_Count(void)
 {
@@ -128,7 +132,7 @@ unsigned Multistate_Value_Count(void)
 }
 
 /**
- * @brief Determines if a given Multistate Input instance is valid
+ * @brief Determines if a given Multistate Value instance is valid
  * @param  object_instance - object-instance number of the object
  * @return  true if the instance is valid, and false if not
  */
@@ -204,7 +208,7 @@ uint32_t Multistate_Value_Max_States(uint32_t object_instance)
     uint32_t count = 0;
     struct object_data *pObject;
 
-    pObject = Keylist_Data(Object_List, object_instance);
+    pObject = Multistate_Value_Object(object_instance);
     if (pObject) {
         count = state_name_count(pObject->State_Text);
     }
@@ -225,7 +229,7 @@ Multistate_Value_State_Text(uint32_t object_instance, uint32_t state_index)
     const char *pName = NULL; /* return value */
     const struct object_data *pObject;
 
-    pObject = Keylist_Data(Object_List, object_instance);
+    pObject = Multistate_Value_Object(object_instance);
     if (pObject) {
         if (state_index > 0) {
             pName = state_name_by_index(pObject->State_Text, state_index);
@@ -287,13 +291,36 @@ bool Multistate_Value_State_Text_List_Set(
     bool status = false;
     struct object_data *pObject;
 
-    pObject = Keylist_Data(Object_List, object_instance);
+    pObject = Multistate_Value_Object(object_instance);
     if (pObject) {
         pObject->State_Text = state_text_list;
         status = true;
     }
 
     return status;
+}
+
+/**
+ * @brief For a given object instance-number, determines the present-value
+ * @param  object_instance - object-instance number of the object
+ * @return  present-value of the object
+ */
+static uint32_t Object_Present_Value(const struct object_data *pObject)
+{
+    uint32_t value = 1;
+    uint8_t priority = 0; /* loop counter */
+
+    if (pObject) {
+        value = pObject->Relinquish_Default;
+        for (priority = 0; priority < BACNET_MAX_PRIORITY; priority++) {
+            if (!pObject->Relinquished[priority]) {
+                value = pObject->Priority_Array[priority];
+                break;
+            }
+        }
+    }
+
+    return value;
 }
 
 /**
@@ -307,47 +334,133 @@ uint32_t Multistate_Value_Present_Value(uint32_t object_instance)
     struct object_data *pObject;
 
     pObject = Multistate_Value_Object(object_instance);
+    value = Object_Present_Value(pObject);
+
+    return value;
+}
+
+/**
+ * @brief Encode a BACnetARRAY property element
+ * @param object_instance [in] BACnet network port object instance number
+ * @param priority [in] array index requested:
+ *    0 to N for individual array members
+ * @param apdu [out] Buffer in which the APDU contents are built, or NULL to
+ * return the length of buffer if it had been built
+ * @return The length of the apdu encoded or
+ *   BACNET_STATUS_ERROR for ERROR_CODE_INVALID_ARRAY_INDEX
+ */
+static int Multistate_Value_Priority_Array_Encode(
+    uint32_t object_instance, BACNET_ARRAY_INDEX priority, uint8_t *apdu)
+{
+    int apdu_len = BACNET_STATUS_ERROR;
+    uint32_t value = 1;
+    struct object_data *pObject;
+
+    pObject = Multistate_Value_Object(object_instance);
+    if (pObject && (priority < BACNET_MAX_PRIORITY)) {
+        if (pObject->Relinquished[priority]) {
+            apdu_len = encode_application_null(apdu);
+        } else {
+            value = pObject->Priority_Array[priority];
+            apdu_len = encode_application_unsigned(apdu, value);
+        }
+    }
+
+    return apdu_len;
+}
+
+/**
+ * @brief For a given object instance-number, determines the active priority
+ * @param  object_instance - object-instance number of the object
+ * @return  active priority 1..16, or 0 if no priority is active
+ */
+unsigned Multistate_Value_Present_Value_Priority(uint32_t object_instance)
+{
+    unsigned p = 0; /* loop counter */
+    unsigned priority = 0; /* return value */
+    struct object_data *pObject;
+
+    pObject = Multistate_Value_Object(object_instance);
     if (pObject) {
-        value = pObject->Present_Value;
+        for (p = 0; p < BACNET_MAX_PRIORITY; p++) {
+            if (!pObject->Relinquished[p]) {
+                priority = p + 1;
+                break;
+            }
+        }
+    }
+
+    return priority;
+}
+
+/**
+ * @brief For a given object instance-number, determines the
+ *  relinquish-default value
+ * @param object_instance - object-instance number
+ * @return relinquish-default value of the object
+ */
+uint32_t Multistate_Value_Relinquish_Default(uint32_t object_instance)
+{
+    uint32_t value = 1;
+    struct object_data *pObject;
+
+    pObject = Multistate_Value_Object(object_instance);
+    if (pObject) {
+        value = pObject->Relinquish_Default;
     }
 
     return value;
 }
 
 /**
- * @brief For a given object instance-number, checks the present-value for COV
- * @param  pObject - specific object with valid data
- * @param  value - floating point analog value
+ * @brief For a given object instance-number, sets the relinquish-default value
+ * @param  object_instance - object-instance number of the object
+ * @param  value - unsigned integer relinquish-default value
+ * @return  true if values are within range and relinquish-default value is set.
  */
-static void Multistate_Value_Present_Value_COV_Detect(
-    struct object_data *pObject, uint32_t value)
+bool Multistate_Value_Relinquish_Default_Set(
+    uint32_t object_instance, uint32_t value)
 {
+    bool status = false;
+    struct object_data *pObject;
+
+    pObject = Multistate_Value_Object(object_instance);
     if (pObject) {
-        if (pObject->Present_Value != value) {
-            pObject->Change_Of_Value = true;
-        }
+        pObject->Relinquish_Default = value;
+        status = true;
     }
+
+    return status;
 }
 
 /**
  * @brief For a given object instance-number, sets the present-value
  * @param  object_instance - object-instance number of the object
  * @param  value - integer multi-state value 1..N
+ * @param  priority - priority-array index value 1..16
  * @return  true if values are within range and present-value is set.
  */
 bool Multistate_Value_Present_Value_Set(
-    uint32_t object_instance, uint32_t value)
+    uint32_t object_instance, uint32_t value, unsigned priority)
 {
     bool status = false;
+    uint32_t old_value = 0;
+    uint32_t new_value = 0;
     struct object_data *pObject;
     unsigned max_states = 0;
 
     pObject = Multistate_Value_Object(object_instance);
     if (pObject) {
         max_states = state_name_count(pObject->State_Text);
-        if ((value >= 1) && (value <= max_states)) {
-            Multistate_Value_Present_Value_COV_Detect(pObject, value);
-            pObject->Present_Value = value;
+        if ((value >= 1) && (value <= max_states) && (priority >= 1) &&
+            (priority <= BACNET_MAX_PRIORITY)) {
+            old_value = Object_Present_Value(pObject);
+            pObject->Relinquished[priority - 1] = false;
+            pObject->Priority_Array[priority - 1] = value;
+            new_value = Object_Present_Value(pObject);
+            if (old_value != new_value) {
+                pObject->Change_Of_Value = true;
+            }
             status = true;
         }
     }
@@ -356,41 +469,133 @@ bool Multistate_Value_Present_Value_Set(
 }
 
 /**
- * For a given object instance-number, sets the present-value
- *
+ * @brief For a given object instance-number, relinquishes the present-value
  * @param  object_instance - object-instance number of the object
- * @param  value - floating point analog value
+ * @param  priority - priority-array index value 1..16
+ * @return  true if values are within range and present-value is relinquished.
+ */
+bool Multistate_Value_Present_Value_Relinquish(
+    uint32_t object_instance, unsigned priority)
+{
+    bool status = false;
+    uint32_t old_value = 0;
+    uint32_t new_value = 0;
+    struct object_data *pObject;
+
+    pObject = Multistate_Value_Object(object_instance);
+    if (pObject) {
+        if ((priority >= 1) && (priority <= BACNET_MAX_PRIORITY)) {
+            old_value = Object_Present_Value(pObject);
+            pObject->Relinquished[priority - 1] = true;
+            pObject->Priority_Array[priority - 1] = 0;
+            new_value = Object_Present_Value(pObject);
+            if (old_value != new_value) {
+                pObject->Change_Of_Value = true;
+            }
+            status = true;
+        }
+    }
+
+    return status;
+}
+
+/**
+ * @brief For a given object instance-number, writes the present-value to the
+ *  remote node
+ * @param  object_instance - object-instance number of the object
+ * @param  value - unsigned integer value
+ * @param  priority - priority-array index value 1..16
  * @param  error_class - the BACnet error class
  * @param  error_code - BACnet Error code
- *
  * @return  true if values are within range and present-value is set.
  */
 static bool Multistate_Value_Present_Value_Write(
     uint32_t object_instance,
     uint32_t value,
+    uint8_t priority,
     BACNET_ERROR_CLASS *error_class,
     BACNET_ERROR_CODE *error_code)
 {
     bool status = false;
     struct object_data *pObject;
-    uint32_t old_value = 1;
+    uint32_t old_value = 0;
+    uint32_t new_value = 0;
+    unsigned max_states = 0;
 
     pObject = Multistate_Value_Object(object_instance);
     if (pObject) {
-        if (value <= UINT32_MAX) {
-            if (pObject->Write_Enabled) {
-                old_value = pObject->Present_Value;
-                Multistate_Value_Present_Value_COV_Detect(pObject, value);
-                pObject->Present_Value = value;
+        max_states = state_name_count(pObject->State_Text);
+        if ((priority >= 1) && (priority <= BACNET_MAX_PRIORITY) &&
+            (value >= 1) && (value <= max_states)) {
+            if (priority != 6) {
+                old_value = Object_Present_Value(pObject);
+                Multistate_Value_Present_Value_Set(
+                    object_instance, value, priority);
                 if (pObject->Out_Of_Service) {
                     /* The physical point that the object represents
                         is not in service. This means that changes to the
                         Present_Value property are decoupled from the
-                        physical point when the value of Out_Of_Service
+                        physical output when the value of Out_Of_Service
                         is true. */
                 } else if (Multistate_Value_Write_Present_Value_Callback) {
+                    new_value = Object_Present_Value(pObject);
                     Multistate_Value_Write_Present_Value_Callback(
-                        object_instance, old_value, value);
+                        object_instance, old_value, new_value);
+                }
+                status = true;
+            } else {
+                *error_class = ERROR_CLASS_PROPERTY;
+                *error_code = ERROR_CODE_WRITE_ACCESS_DENIED;
+            }
+        } else {
+            *error_class = ERROR_CLASS_PROPERTY;
+            *error_code = ERROR_CODE_VALUE_OUT_OF_RANGE;
+        }
+    } else {
+        *error_class = ERROR_CLASS_OBJECT;
+        *error_code = ERROR_CODE_UNKNOWN_OBJECT;
+    }
+
+    return status;
+}
+
+/**
+ * @brief For a given object instance-number, writes the present-value to the
+ *  remote node
+ * @param  object_instance - object-instance number of the object
+ * @param  priority - priority-array index value 1..16
+ * @param  error_class - the BACnet error class
+ * @param  error_code - BACnet Error code
+ * @return  true if values are within range and write is requested
+ */
+static bool Multistate_Value_Present_Value_Relinquish_Write(
+    uint32_t object_instance,
+    uint8_t priority,
+    BACNET_ERROR_CLASS *error_class,
+    BACNET_ERROR_CODE *error_code)
+{
+    bool status = false;
+    struct object_data *pObject;
+    uint32_t old_value = 0;
+    uint32_t new_value = 0;
+
+    pObject = Multistate_Value_Object(object_instance);
+    if (pObject) {
+        if ((priority >= 1) && (priority <= BACNET_MAX_PRIORITY)) {
+            if (priority != 6) {
+                old_value = Object_Present_Value(pObject);
+                Multistate_Value_Present_Value_Relinquish(
+                    object_instance, priority);
+                if (pObject->Out_Of_Service) {
+                    /* The physical point that the object represents
+                        is not in service. This means that changes to the
+                        Present_Value property are decoupled from the
+                        physical output when the value of Out_Of_Service
+                        is true. */
+                } else if (Multistate_Value_Write_Present_Value_Callback) {
+                    new_value = Object_Present_Value(pObject);
+                    Multistate_Value_Write_Present_Value_Callback(
+                        object_instance, old_value, new_value);
                 }
                 status = true;
             } else {
@@ -469,7 +674,7 @@ bool Multistate_Value_Object_Name(
                 characterstring_init_ansi(object_name, pObject->Object_Name);
         } else {
             snprintf(
-                name_text, sizeof(name_text), "MULTI-STATE INPUT %lu",
+                name_text, sizeof(name_text), "MULTI-STATE VALUE %lu",
                 (unsigned long)object_instance);
             status = characterstring_init_ansi(object_name, name_text);
         }
@@ -679,12 +884,14 @@ bool Multistate_Value_Encode_Value_List(
     const bool in_alarm = false;
     bool fault = false;
     const bool overridden = false;
+    uint32_t present_value = 1;
 
     pObject = Multistate_Value_Object(object_instance);
     if (pObject) {
         fault = Multistate_Value_Object_Fault(pObject);
+        present_value = Object_Present_Value(pObject);
         status = cov_value_list_encode_unsigned(
-            value_list, pObject->Present_Value, in_alarm, fault, overridden,
+            value_list, present_value, in_alarm, fault, overridden,
             pObject->Out_Of_Service);
     }
     return status;
@@ -765,6 +972,24 @@ int Multistate_Value_Read_Property(BACNET_READ_PROPERTY_DATA *rpdata)
                 &apdu[apdu_len],
                 Multistate_Value_Max_States(rpdata->object_instance));
             break;
+        case PROP_PRIORITY_ARRAY:
+            apdu_len = bacnet_array_encode(
+                rpdata->object_instance, rpdata->array_index,
+                Multistate_Value_Priority_Array_Encode, BACNET_MAX_PRIORITY,
+                apdu, apdu_size);
+            if (apdu_len == BACNET_STATUS_ABORT) {
+                rpdata->error_code =
+                    ERROR_CODE_ABORT_SEGMENTATION_NOT_SUPPORTED;
+            } else if (apdu_len == BACNET_STATUS_ERROR) {
+                rpdata->error_class = ERROR_CLASS_PROPERTY;
+                rpdata->error_code = ERROR_CODE_INVALID_ARRAY_INDEX;
+            }
+            break;
+        case PROP_RELINQUISH_DEFAULT:
+            present_value =
+                Multistate_Value_Relinquish_Default(rpdata->object_instance);
+            apdu_len = encode_application_unsigned(&apdu[0], present_value);
+            break;
         case PROP_STATE_TEXT:
             max_states = Multistate_Value_Max_States(rpdata->object_instance);
             apdu_len = bacnet_array_encode(
@@ -840,9 +1065,24 @@ bool Multistate_Value_Write_Property(BACNET_WRITE_PROPERTY_DATA *wp_data)
             status = write_property_type_valid(
                 wp_data, &value, BACNET_APPLICATION_TAG_UNSIGNED_INT);
             if (status) {
-                status = Multistate_Value_Present_Value_Write(
-                    wp_data->object_instance, value.type.Enumerated,
-                    &wp_data->error_class, &wp_data->error_code);
+                status = false;
+                if (value.type.Unsigned_Int <= UINT32_MAX) {
+                    status = Multistate_Value_Present_Value_Write(
+                        wp_data->object_instance, value.type.Unsigned_Int,
+                        wp_data->priority, &wp_data->error_class,
+                        &wp_data->error_code);
+                } else {
+                    wp_data->error_class = ERROR_CLASS_PROPERTY;
+                    wp_data->error_code = ERROR_CODE_VALUE_OUT_OF_RANGE;
+                }
+            } else {
+                status = write_property_type_valid(
+                    wp_data, &value, BACNET_APPLICATION_TAG_NULL);
+                if (status) {
+                    status = Multistate_Value_Present_Value_Relinquish_Write(
+                        wp_data->object_instance, wp_data->priority,
+                        &wp_data->error_class, &wp_data->error_code);
+                }
             }
             break;
         case PROP_OUT_OF_SERVICE:
@@ -934,6 +1174,7 @@ uint32_t Multistate_Value_Create(uint32_t object_instance)
 {
     struct object_data *pObject = NULL;
     int index = 0;
+    unsigned priority = 0;
 
     if (object_instance > BACNET_MAX_INSTANCE) {
         return BACNET_MAX_INSTANCE;
@@ -945,7 +1186,7 @@ uint32_t Multistate_Value_Create(uint32_t object_instance)
             the object identifier is a local matter.*/
         object_instance = Keylist_Next_Empty_Key(Object_List, 1);
     }
-    pObject = Keylist_Data(Object_List, object_instance);
+    pObject = Multistate_Value_Object(object_instance);
     if (!pObject) {
         pObject = calloc(1, sizeof(struct object_data));
         if (pObject) {
@@ -954,7 +1195,10 @@ uint32_t Multistate_Value_Create(uint32_t object_instance)
             pObject->Out_Of_Service = false;
             pObject->Reliability = RELIABILITY_NO_FAULT_DETECTED;
             pObject->Change_Of_Value = false;
-            pObject->Present_Value = 1;
+            for (priority = 0; priority < BACNET_MAX_PRIORITY; priority++) {
+                pObject->Relinquished[priority] = true;
+                pObject->Priority_Array[priority] = 0;
+            }
             /* add to list */
             index = Keylist_Data_Add(Object_List, object_instance, pObject);
             if (index < 0) {

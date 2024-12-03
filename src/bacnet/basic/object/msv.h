@@ -64,7 +64,12 @@ BACNET_STACK_EXPORT
 uint32_t Multistate_Value_Present_Value(uint32_t object_instance);
 BACNET_STACK_EXPORT
 bool Multistate_Value_Present_Value_Set(
-    uint32_t object_instance, uint32_t value);
+    uint32_t object_instance, uint32_t value, unsigned priority);
+BACNET_STACK_EXPORT
+bool Multistate_Value_Present_Value_Relinquish(
+    uint32_t instance, unsigned priority);
+BACNET_STACK_EXPORT
+unsigned Multistate_Value_Present_Value_Priority(uint32_t object_instance);
 BACNET_STACK_EXPORT
 void Multistate_Value_Write_Present_Value_Callback_Set(
     multistate_value_write_present_value_callback cb);
@@ -109,6 +114,12 @@ uint32_t Multistate_Value_Max_States(uint32_t instance);
 BACNET_STACK_EXPORT
 const char *
 Multistate_Value_State_Text(uint32_t object_instance, uint32_t state_index);
+
+BACNET_STACK_EXPORT
+uint32_t Multistate_Value_Relinquish_Default(uint32_t object_instance);
+BACNET_STACK_EXPORT
+bool Multistate_Value_Relinquish_Default_Set(
+    uint32_t object_instance, uint32_t value);
 
 BACNET_STACK_EXPORT
 BACNET_RELIABILITY Multistate_Value_Reliability(uint32_t object_instance);
