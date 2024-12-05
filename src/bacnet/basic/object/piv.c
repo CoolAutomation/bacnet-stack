@@ -652,10 +652,14 @@ bool PositiveInteger_Value_Out_Of_Service(uint32_t object_instance)
  */
 void PositiveInteger_Value_Out_Of_Service_Set(uint32_t object_instance, bool value)
 {
-    struct object_data *pObject = PositiveInteger_Value_Object(object_instance);
+    struct object_data *pObject;
 
+    pObject = PositiveInteger_Value_Object(object_instance);
     if (pObject) {
-        pObject->Out_Of_Service = value;
+        if (pObject->Out_Of_Service != value) {
+            pObject->Out_Of_Service = value;
+            pObject->Changed = true;
+        }
     }
 }
 
