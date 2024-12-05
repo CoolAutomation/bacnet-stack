@@ -652,10 +652,14 @@ bool Integer_Value_Out_Of_Service(uint32_t object_instance)
  */
 void Integer_Value_Out_Of_Service_Set(uint32_t object_instance, bool value)
 {
-    struct integer_object *pObject = Integer_Value_Object(object_instance);
+    struct integer_object *pObject;
 
+    pObject = Integer_Value_Object(object_instance);
     if (pObject) {
-        pObject->Out_Of_Service = value;
+        if (pObject->Out_Of_Service != value) {
+            pObject->Out_Of_Service = value;
+            pObject->Changed = true;
+        }
     }
 }
 
