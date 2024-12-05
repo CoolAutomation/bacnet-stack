@@ -541,17 +541,17 @@ static bool Binary_Input_Present_Value_Write(
     pObject = Binary_Input_Object(object_instance);
     if (pObject) {
         if (value <= MAX_BINARY_PV) {
-            if (pObject->Write_Enabled) {
+            if (pObject->Out_Of_Service || pObject->Write_Enabled) {
                 old_value = Binary_Present_Value(pObject->Present_Value);
                 Binary_Input_Present_Value_COV_Detect(pObject, value);
                 pObject->Present_Value = Binary_Present_Value_Boolean(value);
-                if (pObject->Out_Of_Service) {
+                if (pObject->Write_Enabled &&
+                    Binary_Input_Write_Present_Value_Callback) {
                     /* The physical point that the object represents
                         is not in service. This means that changes to the
                         Present_Value property are decoupled from the
                         physical point when the value of Out_Of_Service
                         is true. */
-                } else if (Binary_Input_Write_Present_Value_Callback) {
                     Binary_Input_Write_Present_Value_Callback(
                         object_instance, old_value, value);
                 }
