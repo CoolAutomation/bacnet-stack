@@ -119,7 +119,7 @@ int dlenv_bbmd_result(void)
 }
 #endif
 
-#if defined(BACDL_BIP) && BBMD_ENABLED
+#if defined(BACDL_BIP) && (BBMD_ENABLED || BBMD_CLIENT_ENABLED)
 /** Register as a Foreign Device with the designated BBMD.
  * @ingroup DataLink
  * The BBMD's address, port, and lease time must be provided by
@@ -189,6 +189,7 @@ static int bbmd_register_as_foreign_device(void)
                 (unsigned)BBMD_Address.address[3], (unsigned)BBMD_Address.port);
         }
         BBMD_Timer_Seconds = BBMD_TTL_Seconds;
+#if BBMD_ENABLED
     } else {
         for (entry_number = 1; entry_number <= 128; entry_number++) {
             bdt_entry_valid = false;
@@ -263,6 +264,7 @@ static int bbmd_register_as_foreign_device(void)
                 }
             }
         }
+#endif
     }
     BBMD_Result = retval;
 
@@ -346,9 +348,9 @@ static int bbmd6_register_as_foreign_device(void)
  */
 int dlenv_register_as_foreign_device(void)
 {
-#if defined(BACDL_BIP) && BBMD_ENABLED
+#if defined(BACDL_BIP) && BBMD_CLIENT_ENABLED
     return bbmd_register_as_foreign_device();
-#elif defined(BACDL_BIP) && BBMD_ENABLED
+#elif defined(BACDL_BIP) && BBMD_CLIENT_ENABLED
     return bbmd6_register_as_foreign_device();
 #else
     return 0;
