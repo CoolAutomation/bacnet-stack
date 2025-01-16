@@ -1150,13 +1150,6 @@ bool Analog_Value_Write_Property(BACNET_WRITE_PROPERTY_DATA *wp_data)
                     wp_data->object_instance, value.type.Boolean);
             }
             break;
-        case PROP_UNITS:
-            status = write_property_type_valid(
-                wp_data, &value, BACNET_APPLICATION_TAG_ENUMERATED);
-            if (status) {
-                CurrentAV->Units = value.type.Enumerated;
-            }
-            break;
         case PROP_COV_INCREMENT:
             status = write_property_type_valid(
                 wp_data, &value, BACNET_APPLICATION_TAG_REAL);
