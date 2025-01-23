@@ -26,6 +26,7 @@
 #endif
 
 typedef struct analog_value_descr {
+    bool Write_Enabled : 1;
     unsigned Event_State : 3;
     bool Out_Of_Service;
     uint16_t Units;
@@ -101,6 +102,13 @@ float Analog_Value_Relinquish_Default(uint32_t object_instance);
 BACNET_STACK_EXPORT
 bool Analog_Value_Relinquish_Default_Set(
     uint32_t object_instance, float value);
+
+BACNET_STACK_EXPORT
+bool Analog_Value_Write_Enabled(uint32_t object_instance);
+BACNET_STACK_EXPORT
+void Analog_Value_Write_Enable(uint32_t object_instance);
+BACNET_STACK_EXPORT
+void Analog_Value_Write_Disable(uint32_t object_instance);
 
 BACNET_STACK_EXPORT
 unsigned Analog_Value_Event_State(uint32_t object_instance);

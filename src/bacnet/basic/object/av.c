@@ -52,10 +52,30 @@ static const int Analog_Value_Properties_Optional[] = {
     -1
 };
 
+static const int Analog_Value_Properties_Optional_Read_Only[] = {
+    PROP_DESCRIPTION, PROP_RELIABILITY, PROP_COV_INCREMENT,
+#if defined(INTRINSIC_REPORTING)
+    PROP_TIME_DELAY, PROP_NOTIFICATION_CLASS, PROP_HIGH_LIMIT,
+    PROP_LOW_LIMIT, PROP_DEADBAND, PROP_LIMIT_ENABLE, PROP_EVENT_ENABLE,
+    PROP_ACKED_TRANSITIONS, PROP_NOTIFY_TYPE, PROP_EVENT_TIME_STAMPS,
+#endif
+    -1
+};
+
 static const int Analog_Value_Properties_Proprietary[] = {
     -1
 };
 /* clang-format on */
+
+/**
+ * @brief Gets an object from the list using an instance number as the key
+ * @param  object_instance - object-instance number of the object
+ * @return object found in the list, or NULL if not found
+ */
+static struct analog_value_descr *Analog_Value_Object(uint32_t object_instance)
+{
+    return Keylist_Data(Object_List, object_instance);
+}
 
 /**
  * Initialize the pointers for the required, the optional and the properitary
@@ -68,28 +88,32 @@ static const int Analog_Value_Properties_Proprietary[] = {
 void Analog_Value_Property_Lists(uint32_t object_instance,
     const int **pRequired, const int **pOptional, const int **pProprietary)
 {
-    (void)object_instance;
+    struct analog_value_descr *pObject;
+    bool write_enabled = false; /* by default object is read-only */
+
+    pObject = Analog_Value_Object(object_instance);
+    if (pObject) {
+        write_enabled = pObject->Write_Enabled;
+    }
+
     if (pRequired) {
         *pRequired = Analog_Value_Properties_Required;
     }
     if (pOptional) {
-        *pOptional = Analog_Value_Properties_Optional;
+        if (write_enabled)
+        {
+            *pOptional = Analog_Value_Properties_Optional;
+        }
+        else
+        {
+            *pOptional = Analog_Value_Properties_Optional_Read_Only;
+        }
     }
     if (pProprietary) {
         *pProprietary = Analog_Value_Properties_Proprietary;
     }
 
     return;
-}
-
-/**
- * @brief Gets an object from the list using an instance number as the key
- * @param  object_instance - object-instance number of the object
- * @return object found in the list, or NULL if not found
- */
-static struct analog_value_descr *Analog_Value_Object(uint32_t object_instance)
-{
-    return Keylist_Data(Object_List, object_instance);
 }
 
 #if defined(INTRINSIC_REPORTING)
@@ -390,7 +414,8 @@ static bool Analog_Value_Present_Value_Write(
     pObject = Keylist_Data(Object_List, object_instance);
     if (pObject) {
         if ((priority >= 1) && (priority <= BACNET_MAX_PRIORITY) ) {
-            if (priority != 6) {
+            if ((pObject->Write_Enabled || pObject->Out_Of_Service) &&
+               (priority != 6)) {
                 old_value = Analog_Value_Present_Value(object_instance);
                 Analog_Value_Present_Value_Set(
                     object_instance, value, priority);
@@ -441,7 +466,8 @@ static bool Analog_Value_Present_Value_Relinquish_Write(
     pObject = Keylist_Data(Object_List, object_instance);
     if (pObject) {
         if ((priority >= 1) && (priority <= BACNET_MAX_PRIORITY)) {
-            if (priority != 6) {
+            if ((pObject->Write_Enabled || pObject->Out_Of_Service) &&
+               (priority != 6)) {
                 old_value = Analog_Value_Present_Value(object_instance);
                 Analog_Value_Present_Value_Relinquish(
                     object_instance, priority);
@@ -956,6 +982,9 @@ int Analog_Value_Read_Property(BACNET_READ_PROPERTY_DATA *rpdata)
                 encode_application_enumerated(&apdu[0], CurrentAV->Units);
             break;
         case PROP_PRIORITY_ARRAY:
+            if (!CurrentAV->Write_Enabled)
+                goto _unknown_property;
+
             apdu_len = bacnet_array_encode(
                 rpdata->object_instance, rpdata->array_index,
                 Analog_Value_Priority_Array_Encode, BACNET_MAX_PRIORITY, apdu,
@@ -969,6 +998,9 @@ int Analog_Value_Read_Property(BACNET_READ_PROPERTY_DATA *rpdata)
             }
             break;
         case PROP_RELINQUISH_DEFAULT:
+            if (!CurrentAV->Write_Enabled)
+                goto _unknown_property;
+
             real_value =
                 Analog_Value_Relinquish_Default(rpdata->object_instance);
             apdu_len = encode_application_real(&apdu[0], real_value);
@@ -1061,6 +1093,7 @@ int Analog_Value_Read_Property(BACNET_READ_PROPERTY_DATA *rpdata)
             }
             break;
 #endif
+_unknown_property:
         default:
             rpdata->error_class = ERROR_CLASS_PROPERTY;
             rpdata->error_code = ERROR_CODE_UNKNOWN_PROPERTY;
@@ -1251,7 +1284,9 @@ bool Analog_Value_Write_Property(BACNET_WRITE_PROPERTY_DATA *wp_data)
         default:
             if (property_lists_member(
                     Analog_Value_Properties_Required,
-                    Analog_Value_Properties_Optional,
+                    CurrentAV->Write_Enabled ?
+                      Analog_Value_Properties_Optional :
+                      Analog_Value_Properties_Optional_Read_Only,
                     Analog_Value_Properties_Proprietary,
                     wp_data->object_property)) {
                 wp_data->error_class = ERROR_CLASS_PROPERTY;
@@ -1891,6 +1926,7 @@ uint32_t Analog_Value_Create(uint32_t object_instance)
                 pObject->Priority_Array[priority] = 0.0f;
             }
             pObject->Relinquish_Default = 0.0f;
+            pObject->Write_Enabled = false;
             pObject->Prior_Value = 0.0;
             pObject->Units = UNITS_PERCENT;
             pObject->Out_Of_Service = false;
@@ -1975,4 +2011,50 @@ void Analog_Value_Init(void)
     /* Set handler for GetAlarmSummary Service */
     handler_get_alarm_summary_set(Object_Type, Analog_Value_Alarm_Summary);
 #endif
+}
+
+/**
+ * @brief Determines a object write-enabled flag state
+ * @param object_instance - object-instance number of the object
+ * @return  write-enabled status flag
+ */
+bool Analog_Value_Write_Enabled(uint32_t object_instance)
+{
+    bool value = false;
+    struct analog_value_descr *pObject;
+
+    pObject = Analog_Value_Object(object_instance);
+    if (pObject) {
+        value = pObject->Write_Enabled;
+    }
+
+    return value;
+}
+
+/**
+ * @brief For a given object instance-number, sets the write-enabled flag
+ * @param object_instance - object-instance number of the object
+ */
+void Analog_Value_Write_Enable(uint32_t object_instance)
+{
+    struct analog_value_descr *pObject;
+
+    pObject = Analog_Value_Object(object_instance);
+    if (pObject) {
+        pObject->Write_Enabled = true;
+    }
+}
+
+/**
+ * @brief For a given object instance-number, clears the write-enabled flag
+ * @param object_instance - object-instance number of the object
+ */
+void Analog_Value_Write_Disable(uint32_t object_instance)
+{
+    struct analog_value_descr *pObject;
+
+    pObject = Analog_Value_Object(object_instance);
+    if (pObject) {
+        pObject->Write_Enabled = false;
+    }
 }
