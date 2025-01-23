@@ -103,10 +103,38 @@ static const int Binary_Value_Properties_Optional[] = {
     -1
 };
 
+static const int Binary_Value_Properties_Optional_Read_Only[] = {
+    PROP_DESCRIPTION,
+    PROP_RELIABILITY,
+    PROP_ACTIVE_TEXT,
+    PROP_INACTIVE_TEXT,
+#if defined(INTRINSIC_REPORTING) && (BINARY_VALUE_INTRINSIC_REPORTING)
+    PROP_TIME_DELAY,
+    PROP_NOTIFICATION_CLASS,
+    PROP_ALARM_VALUE,
+    PROP_EVENT_ENABLE,
+    PROP_ACKED_TRANSITIONS,
+    PROP_NOTIFY_TYPE,
+    PROP_EVENT_TIME_STAMPS,
+    PROP_EVENT_DETECTION_ENABLE,
+#endif
+    -1
+};
+
 static const int Binary_Value_Properties_Proprietary[] = {
     -1
 };
 /* clang-format on */
+
+/**
+ * @brief Gets an object from the list using an instance number as the key
+ * @param  object_instance - object-instance number of the object
+ * @return object found in the list, or NULL if not found
+ */
+static struct object_data *Binary_Value_Object(uint32_t object_instance)
+{
+    return Keylist_Data(Object_List, object_instance);
+}
 
 /**
  * Initialize the pointers for the required, the optional and the properitary
@@ -119,28 +147,32 @@ static const int Binary_Value_Properties_Proprietary[] = {
 void Binary_Value_Property_Lists(uint32_t object_instance,
     const int **pRequired, const int **pOptional, const int **pProprietary)
 {
-    (void)object_instance;
+    struct object_data *pObject;
+    bool write_enabled = false; /* by default object is read-only */
+
+    pObject = Binary_Value_Object(object_instance);
+    if (pObject) {
+        write_enabled = pObject->Write_Enabled;
+    }
+
     if (pRequired) {
         *pRequired = Binary_Value_Properties_Required;
     }
     if (pOptional) {
-        *pOptional = Binary_Value_Properties_Optional;
+        if (write_enabled)
+        {
+            *pOptional = Binary_Value_Properties_Optional;
+        }
+        else
+        {
+            *pOptional = Binary_Value_Properties_Optional_Read_Only;
+        }
     }
     if (pProprietary) {
         *pProprietary = Binary_Value_Properties_Proprietary;
     }
 
     return;
-}
-
-/**
- * @brief Gets an object from the list using an instance number as the key
- * @param  object_instance - object-instance number of the object
- * @return object found in the list, or NULL if not found
- */
-static struct object_data *Binary_Value_Object(uint32_t object_instance)
-{
-    return Keylist_Data(Object_List, object_instance);
 }
 
 /**
@@ -637,12 +669,12 @@ static bool Binary_Value_Present_Value_Write(
     bool status = false;
     struct object_data *pObject;
     BACNET_BINARY_PV old_value = BINARY_INACTIVE;
-
     pObject = Binary_Value_Object(object_instance);
     if (pObject) {
         if ((value <= MAX_BINARY_PV) && (priority >= 1) &&
             (priority <= BACNET_MAX_PRIORITY)) {
-            if (pObject->Write_Enabled && (priority != 6)) {
+            if ((pObject->Write_Enabled || pObject->Out_Of_Service) &&
+               (priority != 6)) {
                 old_value = Binary_Value_Present_Value(object_instance);
                 Binary_Value_Present_Value_Set(
                     object_instance, value, priority);
@@ -697,7 +729,8 @@ static bool Binary_Value_Present_Value_Relinquish_Write(
     pObject = Binary_Value_Object(object_instance);
     if (pObject) {
         if ((priority >= 1) && (priority <= BACNET_MAX_PRIORITY)) {
-            if (pObject->Write_Enabled && (priority != 6)) {
+            if ((pObject->Write_Enabled || pObject->Out_Of_Service) &&
+               (priority != 6)) {
                 old_value = Binary_Value_Present_Value(object_instance);
                 Binary_Value_Present_Value_Relinquish(
                     object_instance, priority);
@@ -1026,6 +1059,9 @@ int Binary_Value_Read_Property(BACNET_READ_PROPERTY_DATA *rpdata)
                 &apdu[0], Binary_Value_Present_Value(rpdata->object_instance));
             break;
         case PROP_PRIORITY_ARRAY:
+            if (!pObject->Write_Enabled)
+                goto _unknown_property;
+
             apdu_len = bacnet_array_encode(
                 rpdata->object_instance, rpdata->array_index,
                 Binary_Value_Priority_Array_Encode, BACNET_MAX_PRIORITY, apdu,
@@ -1039,6 +1075,9 @@ int Binary_Value_Read_Property(BACNET_READ_PROPERTY_DATA *rpdata)
             }
             break;
         case PROP_RELINQUISH_DEFAULT:
+            if (!pObject->Write_Enabled)
+                goto _unknown_property;
+
             value =
                 Binary_Value_Relinquish_Default(rpdata->object_instance);
             apdu_len = encode_application_enumerated(&apdu[0], value);
@@ -1159,6 +1198,7 @@ int Binary_Value_Read_Property(BACNET_READ_PROPERTY_DATA *rpdata)
             }
             break;
 #endif
+_unknown_property:
         default:
             rpdata->error_class = ERROR_CLASS_PROPERTY;
             rpdata->error_code = ERROR_CODE_UNKNOWN_PROPERTY;
@@ -1320,7 +1360,9 @@ bool Binary_Value_Write_Property(BACNET_WRITE_PROPERTY_DATA *wp_data)
         default:
             if (property_lists_member(
                     Binary_Value_Properties_Required,
-                    Binary_Value_Properties_Optional,
+                    pObject->Write_Enabled ?
+                      Binary_Value_Properties_Optional :
+                      Binary_Value_Properties_Optional_Read_Only,
                     Binary_Value_Properties_Proprietary,
                     wp_data->object_property)) {
                 wp_data->error_class = ERROR_CLASS_PROPERTY;
