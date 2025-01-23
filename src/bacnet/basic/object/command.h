@@ -36,7 +36,7 @@ typedef struct command_descr {
 } COMMAND_DESCR;
 
 BACNET_STACK_EXPORT
-void Command_Property_Lists(
+void Command_Property_Lists(uint32_t object_instance,
     const int **pRequired, const int **pOptional, const int **pProprietary);
 
 BACNET_STACK_EXPORT

@@ -73,9 +73,10 @@ static const int BACnetARRAY_Properties[] = { PROP_PRIORITY_ARRAY, PROP_TAGS,
  * @param pProprietary - pointer to list of int terminated by -1, of
  * BACnet proprietary properties for this object.
  */
-void Calendar_Property_Lists(
+void Calendar_Property_Lists(uint32_t object_instance,
     const int **pRequired, const int **pOptional, const int **pProprietary)
 {
+    (void)object_instance;
     if (pRequired) {
         *pRequired = Calendar_Properties_Required;
     }

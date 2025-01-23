@@ -82,9 +82,10 @@ static const int BACnetARRAY_Properties[] = { PROP_PRIORITY_ARRAY,
  * @param pProprietary - pointer to list of int terminated by -1, of
  * BACnet proprietary properties for this object.
  */
-void Time_Value_Property_Lists(
+void Time_Value_Property_Lists(uint32_t object_instance,
     const int **pRequired, const int **pOptional, const int **pProprietary)
 {
+    (void)object_instance;
     if (pRequired) {
         *pRequired = Time_Value_Properties_Required;
     }

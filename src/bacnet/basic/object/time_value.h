@@ -31,7 +31,7 @@ extern "C" {
 #endif /* __cplusplus */
 
 BACNET_STACK_EXPORT
-void Time_Value_Property_Lists(
+void Time_Value_Property_Lists(uint32_t object_instance,
     const int **pRequired, const int **pOptional, const int **pProprietary);
 BACNET_STACK_EXPORT
 bool Time_Value_Valid_Instance(uint32_t object_instance);

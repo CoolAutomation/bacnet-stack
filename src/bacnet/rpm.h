@@ -50,7 +50,7 @@ typedef struct BACnet_Read_Access_Data {
  * @param pProprietary [out] Pointer reference for the list of Proprietary
  *                           properties for this BACNET_OBJECT_TYPE.
  */
-typedef void (*rpm_property_lists_function)(
+typedef void (*rpm_property_lists_function)(uint32_t object_instance,
     const int **pRequired, const int **pOptional, const int **pProprietary);
 
 typedef void (*rpm_object_property_lists_function)(

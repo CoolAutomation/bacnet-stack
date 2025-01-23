@@ -116,9 +116,10 @@ static const int Binary_Value_Properties_Proprietary[] = {
  * @param pOptional - Pointer to the pointer of optional values.
  * @param pProprietary - Pointer to the pointer of properitary values.
  */
-void Binary_Value_Property_Lists(
+void Binary_Value_Property_Lists(uint32_t object_instance,
     const int **pRequired, const int **pOptional, const int **pProprietary)
 {
+    (void)object_instance;
     if (pRequired) {
         *pRequired = Binary_Value_Properties_Required;
     }

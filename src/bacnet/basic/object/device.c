@@ -458,7 +458,6 @@ void Device_Objects_Property_List(
 {
     struct object_functions *pObject = NULL;
 
-    (void)object_instance;
     pPropertyList->Required.pList = NULL;
     pPropertyList->Optional.pList = NULL;
     pPropertyList->Proprietary.pList = NULL;
@@ -470,7 +469,7 @@ void Device_Objects_Property_List(
 
     pObject = Device_Objects_Find_Functions(object_type);
     if ((pObject != NULL) && (pObject->Object_RPM_List != NULL)) {
-        pObject->Object_RPM_List(
+        pObject->Object_RPM_List(object_instance,
             &pPropertyList->Required.pList, &pPropertyList->Optional.pList,
             &pPropertyList->Proprietary.pList);
     }
@@ -524,9 +523,10 @@ static const int Device_Properties_Proprietary[] = {
 };
 /* clang-format on */
 
-void Device_Property_Lists(
+void Device_Property_Lists(uint32_t object_instance,
     const int **pRequired, const int **pOptional, const int **pProprietary)
 {
+    (void)object_instance;
     if (pRequired) {
         *pRequired = Device_Properties_Required;
     }

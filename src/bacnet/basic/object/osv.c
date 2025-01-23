@@ -37,9 +37,10 @@ static const int OctetString_Value_Properties_Optional[] = {
 
 static const int OctetString_Value_Properties_Proprietary[] = { -1 };
 
-void OctetString_Value_Property_Lists(
+void OctetString_Value_Property_Lists(uint32_t object_instance,
     const int **pRequired, const int **pOptional, const int **pProprietary)
 {
+    (void)object_instance;
     if (pRequired) {
         *pRequired = OctetString_Value_Properties_Required;
     }
