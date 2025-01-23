@@ -387,6 +387,12 @@ void RS485_Send_Frame(
         } else {
             /* wait until all output has been transmitted. */
             tcdrain(RS485_Handle);
+            /* add delay after write to simulate real RS485 tty */
+            /* TODO: it shoud be applied only for /dev/pts/xxx, as
+             * they don't have tcdrain() and there is no mechanism
+             * for PTS to make caller wait until the data is
+             * "processed"/sent to the wire */
+            usleep( ((1000000/*usec*/ / baud) * 10) * nbytes );
         }
         /*  tcdrain(RS485_Handle); */
         /* per MSTP spec, sort of */
@@ -406,7 +412,7 @@ void RS485_Send_Frame(
            causing any other effect.  For a special file, the results are not
            portable.
          */
-        written = write(poSharedData->RS485_Handle, buffer, nbytes);
+        // written = write(poSharedData->RS485_Handle, buffer, nbytes);
         greska = errno;
         if (written <= 0) {
             printf("write error: %s\n", strerror(greska));
