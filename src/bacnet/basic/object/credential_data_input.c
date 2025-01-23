@@ -36,9 +36,10 @@ static const int Properties_Optional[] = { -1 };
 
 static const int Properties_Proprietary[] = { -1 };
 
-void Credential_Data_Input_Property_Lists(
+void Credential_Data_Input_Property_Lists(uint32_t object_instance,
     const int **pRequired, const int **pOptional, const int **pProprietary)
 {
+    (void)object_instance;
     if (pRequired) {
         *pRequired = Properties_Required;
     }

@@ -30,7 +30,7 @@ extern "C" {
 #endif /* __cplusplus */
 
 BACNET_STACK_EXPORT
-void Color_Temperature_Property_Lists(
+void Color_Temperature_Property_Lists(uint32_t object_instance,
     const int **pRequired, const int **pOptional, const int **pProprietary);
 BACNET_STACK_EXPORT
 bool Color_Temperature_Valid_Instance(uint32_t object_instance);

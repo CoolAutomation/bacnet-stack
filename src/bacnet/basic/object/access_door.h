@@ -41,7 +41,7 @@ typedef struct {
 } ACCESS_DOOR_DESCR;
 
 BACNET_STACK_EXPORT
-void Access_Door_Property_Lists(
+void Access_Door_Property_Lists(uint32_t object_instance,
     const int **pRequired, const int **pOptional, const int **pProprietary);
 BACNET_STACK_EXPORT
 bool Access_Door_Valid_Instance(uint32_t object_instance);

@@ -126,9 +126,10 @@ static const int Load_Control_Properties_Proprietary[] = {
 };
 /* clang-format on */
 
-void Load_Control_Property_Lists(
+void Load_Control_Property_Lists(uint32_t object_instance,
     const int **pRequired, const int **pOptional, const int **pProprietary)
 {
+    (void)object_instance;
     if (pRequired) {
         *pRequired = Load_Control_Properties_Required;
     }

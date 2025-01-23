@@ -45,9 +45,10 @@ static const int Properties_Optional[] = {
 
 static const int Properties_Proprietary[] = { -1 };
 
-void Access_Door_Property_Lists(
+void Access_Door_Property_Lists(uint32_t object_instance,
     const int **pRequired, const int **pOptional, const int **pProprietary)
 {
+    (void)object_instance;
     if (pRequired) {
         *pRequired = Properties_Required;
     }

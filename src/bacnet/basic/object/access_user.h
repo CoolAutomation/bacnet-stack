@@ -40,7 +40,7 @@ typedef struct {
 } ACCESS_USER_DESCR;
 
 BACNET_STACK_EXPORT
-void Access_User_Property_Lists(
+void Access_User_Property_Lists(uint32_t object_instance,
     const int **pRequired, const int **pOptional, const int **pProprietary);
 BACNET_STACK_EXPORT
 bool Access_User_Valid_Instance(uint32_t object_instance);

@@ -316,9 +316,10 @@ void Network_Port_Property_List(
  * @param pProprietary - pointer to list of int terminated by -1, of
  * BACnet proprietary properties for this object.
  */
-void Network_Port_Property_Lists(
+void Network_Port_Property_Lists(uint32_t object_instance,
     const int **pRequired, const int **pOptional, const int **pProprietary)
 {
+    (void)object_instance;
     Network_Port_Property_List(
         Object_List[0].Instance_Number, pRequired, pOptional, pProprietary);
 }

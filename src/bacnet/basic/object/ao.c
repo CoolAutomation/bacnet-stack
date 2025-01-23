@@ -91,9 +91,10 @@ static const int Analog_Output_Properties_Proprietary[] = { -1 };
  * @param pProprietary - pointer to list of int terminated by -1, of
  * BACnet proprietary properties for this object.
  */
-void Analog_Output_Property_Lists(
+void Analog_Output_Property_Lists(uint32_t object_instance,
     const int **pRequired, const int **pOptional, const int **pProprietary)
 {
+    (void)object_instance;
     if (pRequired) {
         *pRequired = Analog_Output_Properties_Required;
     }

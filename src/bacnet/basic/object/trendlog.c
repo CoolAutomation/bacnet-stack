@@ -73,9 +73,10 @@ static const int Trend_Log_Properties_Optional[] = {
 
 static const int Trend_Log_Properties_Proprietary[] = { -1 };
 
-void Trend_Log_Property_Lists(
+void Trend_Log_Property_Lists(uint32_t object_instance,
     const int **pRequired, const int **pOptional, const int **pProprietary)
 {
+    (void)object_instance;
     if (pRequired) {
         *pRequired = Trend_Log_Properties_Required;
     }

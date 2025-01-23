@@ -49,7 +49,7 @@ typedef struct Ack_Notification {
 } ACK_NOTIFICATION;
 
 BACNET_STACK_EXPORT
-void Notification_Class_Property_Lists(
+void Notification_Class_Property_Lists(uint32_t object_instance,
     const int **pRequired, const int **pOptional, const int **pProprietary);
 
 BACNET_STACK_EXPORT

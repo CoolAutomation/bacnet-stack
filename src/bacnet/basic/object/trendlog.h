@@ -113,7 +113,7 @@ typedef struct tl_log_info {
 #define TL_TYPE_ANY 10 /* We don't support this particular can of worms! */
 
 BACNET_STACK_EXPORT
-void Trend_Log_Property_Lists(
+void Trend_Log_Property_Lists(uint32_t object_instance,
     const int **pRequired, const int **pOptional, const int **pProprietary);
 
 BACNET_STACK_EXPORT

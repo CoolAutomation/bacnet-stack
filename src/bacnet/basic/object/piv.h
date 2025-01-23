@@ -27,7 +27,7 @@ typedef struct positiveinteger_value_descr {
 } POSITIVEINTEGER_VALUE_DESCR;
 
 BACNET_STACK_EXPORT
-void PositiveInteger_Value_Property_Lists(
+void PositiveInteger_Value_Property_Lists(uint32_t object_instance,
     const int **pRequired, const int **pOptional, const int **pProprietary);
 BACNET_STACK_EXPORT
 bool PositiveInteger_Value_Valid_Instance(uint32_t object_instance);

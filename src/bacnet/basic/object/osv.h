@@ -27,7 +27,7 @@ typedef struct octetstring_value_descr {
 } OCTETSTRING_VALUE_DESCR;
 
 BACNET_STACK_EXPORT
-void OctetString_Value_Property_Lists(
+void OctetString_Value_Property_Lists(uint32_t object_instance,
     const int **pRequired, const int **pOptional, const int **pProprietary);
 BACNET_STACK_EXPORT
 bool OctetString_Value_Valid_Instance(uint32_t object_instance);

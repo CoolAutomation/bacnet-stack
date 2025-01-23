@@ -42,9 +42,21 @@ static const int PositiveInteger_Value_Properties_Optional[] = {
 
 static const int PositiveInteger_Value_Properties_Proprietary[] = { -1 };
 
-void PositiveInteger_Value_Property_Lists(
+/**
+ * Returns the list of required, optional, and proprietary properties.
+ * Used by ReadPropertyMultiple service.
+ *
+ * @param pRequired - pointer to list of int terminated by -1, of
+ * BACnet required properties for this object.
+ * @param pOptional - pointer to list of int terminated by -1, of
+ * BACnet optkional properties for this object.
+ * @param pProprietary - pointer to list of int terminated by -1, of
+ * BACnet proprietary properties for this object.
+ */
+void PositiveInteger_Value_Property_Lists(uint32_t object_instance,
     const int **pRequired, const int **pOptional, const int **pProprietary)
 {
+    (void)object_instance;
     if (pRequired) {
         *pRequired = PositiveInteger_Value_Properties_Required;
     }

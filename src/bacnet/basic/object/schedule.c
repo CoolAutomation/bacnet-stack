@@ -47,9 +47,10 @@ static const int Schedule_Properties_Optional[] = { PROP_WEEKLY_SCHEDULE,
 
 static const int Schedule_Properties_Proprietary[] = { -1 };
 
-void Schedule_Property_Lists(
+void Schedule_Property_Lists(uint32_t object_instance,
     const int **pRequired, const int **pOptional, const int **pProprietary)
 {
+    (void)object_instance;
     if (pRequired) {
         *pRequired = Schedule_Properties_Required;
     }

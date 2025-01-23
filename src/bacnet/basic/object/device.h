@@ -236,7 +236,7 @@ BACNET_STACK_EXPORT
 bool Device_Interval_Offset_Set(uint32_t value);
 
 BACNET_STACK_EXPORT
-void Device_Property_Lists(
+void Device_Property_Lists(uint32_t object_instance,
     const int **pRequired, const int **pOptional, const int **pProprietary);
 BACNET_STACK_EXPORT
 void Device_Objects_Property_List(
