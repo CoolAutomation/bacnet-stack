@@ -21,6 +21,8 @@
 #include "bacnet/wp.h"
 #include "bacnet/rp.h"
 #include "bacnet/cov.h"
+#include "bacnet/proplist.h"
+/* basic objects and services */
 #include "bacnet/basic/services.h"
 #include "bacnet/basic/object/device.h"
 #include "bacnet/basic/sys/keylist.h"
@@ -1039,13 +1041,6 @@ int Binary_Value_Read_Property(BACNET_READ_PROPERTY_DATA *rpdata)
             apdu_len = BACNET_STATUS_ERROR;
             break;
     }
-    /* Only array properties can have array options. */
-    if ((apdu_len >= 0) && (rpdata->object_property != PROP_PRIORITY_ARRAY) &&
-        (rpdata->array_index != BACNET_ARRAY_ALL)) {
-        rpdata->error_class = ERROR_CLASS_PROPERTY;
-        rpdata->error_code = ERROR_CODE_PROPERTY_IS_NOT_AN_ARRAY;
-        apdu_len = BACNET_STATUS_ERROR;
-    }
 
     return apdu_len;
 }
@@ -1072,7 +1067,6 @@ bool Binary_Value_Write_Property(BACNET_WRITE_PROPERTY_DATA *wp_data)
     if (wp_data->application_data_len == 0) {
         return false;
     }
-
     /* Decode the some of the request. */
     len = bacapp_decode_application_data(
         wp_data->application_data, wp_data->application_data_len, &value);
@@ -1088,13 +1082,6 @@ bool Binary_Value_Write_Property(BACNET_WRITE_PROPERTY_DATA *wp_data)
         (void)pObject;
 #endif
         return BACNET_STATUS_ERROR;
-    }
-    /* Only array properties can have array options. */
-    if ((wp_data->object_property != PROP_PRIORITY_ARRAY) &&
-        (wp_data->array_index != BACNET_ARRAY_ALL)) {
-        wp_data->error_class = ERROR_CLASS_PROPERTY;
-        wp_data->error_code = ERROR_CODE_PROPERTY_IS_NOT_AN_ARRAY;
-        return false;
     }
     switch (wp_data->object_property) {
         case PROP_PRESENT_VALUE:
