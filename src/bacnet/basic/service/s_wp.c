@@ -24,6 +24,9 @@
 #include "bacnet/basic/tsm/tsm.h"
 #include "bacnet/datalink/datalink.h"
 
+#define LOG_MODULE "basic/service/s_wp"
+#include "bacnet/basic/sys/log.h"
+
 /**
  * @brief Send a WriteProperty-Request service message
  * @ingroup BIBB-DS-WP-A
@@ -92,15 +95,14 @@ uint8_t Send_Write_Property_Request_Data(
             bytes_sent = datalink_send_pdu(
                 &dest, &npdu_data, &Handler_Transmit_Buffer[0], pdu_len);
             if (bytes_sent <= 0) {
-                debug_perror("Failed to Send WriteProperty Request");
+                log_perror("Failed to Send WriteProperty Request");
             }
         } else {
             tsm_free_invoke_id(invoke_id);
             invoke_id = 0;
-            debug_fprintf(
-                stderr,
+            log_err(
                 "Failed to Send WriteProperty Request "
-                "(exceeds destination maximum APDU)!\n");
+                "(exceeds destination maximum APDU)!");
         }
     }
 
@@ -135,9 +137,9 @@ uint8_t Send_Write_Property_Request(
     int apdu_len = 0, len = 0;
 
     while (object_value) {
-        debug_printf(
+        log_debug(
             "WriteProperty service: "
-            "%s tag=%d\n",
+            "%s tag=%d",
             (object_value->context_specific ? "context" : "application"),
             (int)(object_value->context_specific ? object_value->context_tag
                                                  : object_value->tag));

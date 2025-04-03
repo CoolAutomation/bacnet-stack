@@ -29,6 +29,9 @@
 #include "bacnet/datalink/datalink.h"
 #include "bacnet/basic/services.h"
 
+#define LOG_MODULE "basic/service/s_get_event"
+#include "bacnet/basic/sys/log.h"
+
 uint8_t Send_Get_Event_Information_Address(
     BACNET_ADDRESS *dest,
     uint16_t max_apdu,
@@ -62,15 +65,14 @@ uint8_t Send_Get_Event_Information_Address(
             bytes_sent = datalink_send_pdu(
                 dest, &npdu_data, &Handler_Transmit_Buffer[0], pdu_len);
             if (bytes_sent <= 0) {
-                debug_perror("Failed to Send Get Event Information Request");
+                log_perror("Failed to Send Get Event Information Request");
             }
         } else {
             tsm_free_invoke_id(invoke_id);
             invoke_id = 0;
-            debug_fprintf(
-                stderr,
+            log_err(
                 "Failed to Send Get Event Information Request "
-                "(exceeds destination maximum APDU)!\n");
+                "(exceeds destination maximum APDU)!");
         }
     }
 

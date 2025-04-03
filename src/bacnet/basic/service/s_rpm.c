@@ -24,6 +24,9 @@
 #include "bacnet/basic/services.h"
 #include "bacnet/basic/sys/debug.h"
 
+#define LOG_MODULE "basic/service/s_rpm"
+#include "bacnet/basic/sys/log.h"
+
 /**
  * @brief Sends a Read Property Multiple request.
  * @ingroup BIBB-DS-RPM-A
@@ -82,15 +85,14 @@ uint8_t Send_Read_Property_Multiple_Request(
                 invoke_id, &dest, &npdu_data, &pdu[0], (uint16_t)pdu_len);
             bytes_sent = datalink_send_pdu(&dest, &npdu_data, &pdu[0], pdu_len);
             if (bytes_sent <= 0) {
-                debug_perror("Failed to Send ReadPropertyMultiple Request");
+                log_perror("Failed to Send ReadPropertyMultiple Request");
             }
         } else {
             tsm_free_invoke_id(invoke_id);
             invoke_id = 0;
-            debug_fprintf(
-                stderr,
+            log_err(
                 "Failed to Send ReadPropertyMultiple Request "
-                "(exceeds destination maximum APDU)!\n");
+                "(exceeds destination maximum APDU)!");
         }
     }
 

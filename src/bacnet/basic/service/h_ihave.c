@@ -17,6 +17,9 @@
 #include "bacnet/basic/services.h"
 #include "bacnet/basic/tsm/tsm.h"
 
+#define LOG_MODULE "basic/service/h_ihave"
+#include "bacnet/basic/sys/log.h"
+
 /** Simple Handler for I-Have responses (just validates response).
  * @ingroup DMDOB
  * @param service_request [in] The received message to be handled.
@@ -33,18 +36,14 @@ void handler_i_have(
     (void)src;
     len = ihave_decode_service_request(service_request, service_len, &data);
     if (len != -1) {
-#if PRINT_ENABLED
-        fprintf(
-            stderr, "I-Have: %s %lu from %s %lu!\r\n",
+        log_info(
+            "I-Have: %s %lu from %s %lu!",
             bactext_object_type_name(data.object_id.type),
             (unsigned long)data.object_id.instance,
             bactext_object_type_name(data.device_id.type),
             (unsigned long)data.device_id.instance);
-#endif
     } else {
-#if PRINT_ENABLED
-        fprintf(stderr, "I-Have: received, but unable to decode!\n");
-#endif
+        log_err("I-Have: received, but unable to decode!");
     }
 
     return;

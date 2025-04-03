@@ -25,6 +25,9 @@
 #include "bacnet/basic/services.h"
 #include "bacnet/basic/sys/debug.h"
 
+#define LOG_MODULE "basic/service/s_readrange"
+#include "bacnet/basic/sys/log.h"
+
 /**
  * @brief Send a ReadRange-Request message
  * @param device_id [in] ID of the destination device
@@ -81,15 +84,14 @@ uint8_t Send_ReadRange_Request(
             bytes_sent = datalink_send_pdu(
                 &dest, &npdu_data, &Handler_Transmit_Buffer[0], pdu_len);
             if (bytes_sent <= 0) {
-                debug_perror("Failed to Send ReadRange Request");
+                log_perror("Failed to Send ReadRange Request");
             }
         } else {
             tsm_free_invoke_id(invoke_id);
             invoke_id = 0;
-            debug_fprintf(
-                stderr,
+            log_err(
                 "Failed to Send ReadRange Request (exceeds destination "
-                "maximum APDU)!\n");
+                "maximum APDU)!");
         }
     }
 

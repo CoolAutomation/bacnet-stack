@@ -22,6 +22,9 @@
 #include "bacnet/basic/tsm/tsm.h"
 #include "bacnet/basic/services.h"
 
+#define LOG_MODULE "basic/service/h_arf_a"
+#include "bacnet/basic/sys/log.h"
+
 /* We performed an AtomicReadFile Request, */
 /* and here is the data from the server */
 /* Note: it does not have to be the same file=instance */
@@ -42,9 +45,7 @@ void handler_atomic_read_file_ack(
     /* get the file instance from the tsm data before freeing it */
     instance = bacfile_instance_from_tsm(service_data->invoke_id);
     len = arf_ack_decode_service_request(service_request, service_len, &data);
-#if PRINT_ENABLED
-    fprintf(stderr, "Received Read-File Ack!\n");
-#endif
+    log_info("Received Read-File Ack!");
     if ((len > 0) && (instance <= BACNET_MAX_INSTANCE)) {
         /* write the data received to the file specified */
         if (data.access == FILE_STREAM_ACCESS) {

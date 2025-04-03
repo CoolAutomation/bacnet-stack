@@ -25,6 +25,9 @@
 #include "bacnet/datalink/datalink.h"
 #include "bacnet/basic/sys/debug.h"
 
+#define LOG_MODULE "basic/service/s_lso"
+#include "bacnet/basic/sys/log.h"
+
 /**
  * @brief Send a Life Safety Operation service message
  * @ingroup BIBB-AE-LS-A
@@ -75,15 +78,14 @@ Send_Life_Safety_Operation_Data(uint32_t device_id, const BACNET_LSO_DATA *data)
             bytes_sent = datalink_send_pdu(
                 &dest, &npdu_data, &Handler_Transmit_Buffer[0], pdu_len);
             if (bytes_sent <= 0) {
-                debug_perror("Failed to Send Life Safe Op Request");
+                log_perror("Failed to Send Life Safe Op Request");
             }
         } else {
             tsm_free_invoke_id(invoke_id);
             invoke_id = 0;
-            debug_fprintf(
-                stderr,
+            log_err(
                 "Failed to Send Life Safe Op Request "
-                "(exceeds destination maximum APDU)!\n");
+                "(exceeds destination maximum APDU)!");
         }
     }
 

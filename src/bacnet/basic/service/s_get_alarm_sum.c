@@ -26,6 +26,9 @@
 #include "bacnet/datalink/datalink.h"
 #include "bacnet/basic/services.h"
 
+#define LOG_MODULE "bacnet/service/s_get_alarm_sum"
+#include "bacnet/basic/sys/log.h"
+
 uint8_t Send_Get_Alarm_Summary_Address(BACNET_ADDRESS *dest, uint16_t max_apdu)
 {
     int len = 0;
@@ -56,15 +59,14 @@ uint8_t Send_Get_Alarm_Summary_Address(BACNET_ADDRESS *dest, uint16_t max_apdu)
             bytes_sent = datalink_send_pdu(
                 dest, &npdu_data, &Handler_Transmit_Buffer[0], pdu_len);
             if (bytes_sent <= 0) {
-                debug_perror("Failed to Send Get Alarm Summary Request");
+                log_err("Failed to Send Get Alarm Summary Request");
             }
         } else {
             tsm_free_invoke_id(invoke_id);
             invoke_id = 0;
-            debug_fprintf(
-                stderr,
+            log_err(
                 "Failed to Send Get Alarm Summary Request "
-                "(exceeds destination maximum APDU)!\n");
+                "(exceeds destination maximum APDU)!");
         }
     }
 

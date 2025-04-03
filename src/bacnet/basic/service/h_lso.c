@@ -25,6 +25,9 @@
 #include "bacnet/basic/sys/debug.h"
 #include "bacnet/datalink/datalink.h"
 
+#define LOG_MODULE "basic/service/h_lso"
+#include "bacnet/basic/sys/log.h"
+
 void handler_lso(
     uint8_t *service_request,
     uint16_t service_len,
@@ -47,50 +50,49 @@ void handler_lso(
         len = reject_encode_apdu(
             &Handler_Transmit_Buffer[pdu_len], service_data->invoke_id,
             REJECT_REASON_MISSING_REQUIRED_PARAMETER);
-        debug_print("LSO: Missing Required Parameter. Sending Reject!\n");
+        log_info("LSO: Missing Required Parameter. Sending Reject!");
         goto LSO_ABORT;
     } else if (service_data->segmented_message) {
         /* we don't support segmentation - send an abort */
         len = abort_encode_apdu(
             &Handler_Transmit_Buffer[pdu_len], service_data->invoke_id,
             ABORT_REASON_SEGMENTATION_NOT_SUPPORTED, true);
-        debug_print("LSO: Segmented message.  Sending Abort!\n");
+        log_info("LSO: Segmented message.  Sending Abort!");
         goto LSO_ABORT;
     }
 
     len = lso_decode_service_request(service_request, service_len, &data);
     if (len <= 0) {
-        debug_print("LSO: Unable to decode Request!\n");
+        log_err("LSO: Unable to decode Request!");
     }
     if (len < 0) {
         /* bad decoding - send an abort */
         len = abort_encode_apdu(
             &Handler_Transmit_Buffer[pdu_len], service_data->invoke_id,
             ABORT_REASON_OTHER, true);
-        debug_print("LSO: Bad Encoding.  Sending Abort!\n");
+        log_err("LSO: Bad Encoding.  Sending Abort!");
         goto LSO_ABORT;
     }
 
     /*
      ** Process Life Safety Operation Here
      */
-    debug_fprintf(
-        stderr,
+    log_debug(
         "Life Safety Operation: Received operation %d from process id %lu "
-        "for object %lu\n",
+        "for object %lu",
         data.operation, (unsigned long)data.processId,
         (unsigned long)data.targetObject.instance);
     len = encode_simple_ack(
         &Handler_Transmit_Buffer[pdu_len], service_data->invoke_id,
         SERVICE_CONFIRMED_LIFE_SAFETY_OPERATION);
-    debug_print("Life Safety Operation: "
-                "Sending Simple Ack!\n");
+    log_debug("Life Safety Operation: "
+                "Sending Simple Ack!");
 LSO_ABORT:
     pdu_len += len;
     bytes_sent = datalink_send_pdu(
         src, &npdu_data, &Handler_Transmit_Buffer[0], pdu_len);
     if (bytes_sent <= 0) {
-        debug_perror("Life Safety Operation: Failed to send PDU");
+        log_perror("Life Safety Operation: Failed to send PDU");
     }
 
     return;

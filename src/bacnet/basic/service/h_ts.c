@@ -20,6 +20,9 @@
 #include "bacnet/basic/services.h"
 #include "bacnet/basic/tsm/tsm.h"
 
+#define LOG_MODULE "basic/service/h_ts"
+#include "bacnet/basic/sys/log.h"
+
 /** @file h_ts.c  Handles TimeSync requests. */
 
 #if defined(BACNET_TIME_MASTER)
@@ -33,22 +36,20 @@ BACNET_RECIPIENT_LIST Time_Sync_Recipients[MAX_TIME_SYNC_RECIPIENTS];
 static BACNET_DATE_TIME Next_Sync_Time;
 #endif
 
-#if PRINT_ENABLED
 static void
-show_bacnet_date_time(const BACNET_DATE *bdate, const BACNET_TIME *btime)
+log_bacnet_date_time(
+    const char *s, const BACNET_DATE *bdate, const BACNET_TIME *btime)
 {
-    /* show the date received */
-    fprintf(stderr, "%u", (unsigned)bdate->year);
-    fprintf(stderr, "/%u", (unsigned)bdate->month);
-    fprintf(stderr, "/%u", (unsigned)bdate->day);
-    /* show the time received */
-    fprintf(stderr, " %02u", (unsigned)btime->hour);
-    fprintf(stderr, ":%02u", (unsigned)btime->min);
-    fprintf(stderr, ":%02u", (unsigned)btime->sec);
-    fprintf(stderr, ".%02u", (unsigned)btime->hundredths);
-    fprintf(stderr, "\r\n");
+    log_debug("%s: %u/%u/%u %02u:%02u:%02u.%02u",
+              s,
+              (unsigned)bdate->year,
+              (unsigned)bdate->month,
+              (unsigned)bdate->day,
+              (unsigned)btime->hour,
+              (unsigned)btime->min,
+              (unsigned)btime->sec,
+              (unsigned)btime->hundredths);
 }
-#endif
 
 /* Callback for timesync set */
 static handler_timesync_set_callback_t handler_timesync_set_callback;
@@ -70,10 +71,8 @@ void handler_timesync(
             if (handler_timesync_set_callback) {
                 handler_timesync_set_callback(&bdate, &btime, false);
             }
-#if PRINT_ENABLED
-            fprintf(stderr, "Received Local TimeSyncronization Request\r\n");
-            show_bacnet_date_time(&bdate, &btime);
-#endif
+            log_bacnet_date_time(
+                "Received Local TimeSyncronization Request", &bdate, &btime);
         }
     }
 
@@ -96,10 +95,8 @@ void handler_timesync_utc(
             if (handler_timesync_set_callback) {
                 handler_timesync_set_callback(&bdate, &btime, true);
             }
-#if PRINT_ENABLED
-            fprintf(stderr, "Received UTC TimeSyncronization Request\r\n");
-            show_bacnet_date_time(&bdate, &btime);
-#endif
+            log_bacnet_date_time(
+                "Received TUC TimeSyncronization Request", &bdate, &btime);
         }
     }
 

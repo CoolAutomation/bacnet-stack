@@ -17,6 +17,9 @@
 #include "bacnet/basic/bbmd6/vmac.h"
 #include "bacnet/basic/bbmd6/h_bbmd6.h"
 
+#define LOG_MODULE "basic/service/bbmd6"
+#include "bacnet/basic/sys/log.h"
+
 static bool BVLC6_Debug;
 #if PRINT_ENABLED
 #include <stdarg.h>
@@ -177,6 +180,7 @@ static void bbmd6_add_vmac(uint32_t device_id, const BACNET_IP6_ADDRESS *addr)
                 /* valid VMAC entry exists. */
                 found = true;
             } else {
+                /* TODO: switch to new logging system */
                 /* VMAC exists, but device ID changed */
                 VMAC_Delete(list_device_id);
                 PRINTF(
@@ -192,6 +196,7 @@ static void bbmd6_add_vmac(uint32_t device_id, const BACNET_IP6_ADDRESS *addr)
             }
         }
         if (!found) {
+            /* TODO: switch to new logging system */
             vmac = VMAC_Find_By_Key(device_id);
             if (vmac) {
                 /* device ID already exists. Update MAC. */
@@ -261,8 +266,8 @@ static bool bbmd6_address_from_bacnet_address(
         if (status) {
             vmac = VMAC_Find_By_Key(device_id);
             if (vmac) {
-                PRINTF(
-                    "BVLC6: Found VMAC %lu (len=%u).\n",
+                log_debug(
+                    "BVLC6: Found VMAC %lu (len=%u)",
                     (unsigned long)device_id, (unsigned)vmac->mac_len);
                 status = bbmd6_address_from_vmac(addr, vmac);
                 if (vmac_src) {
@@ -311,13 +316,13 @@ int bvlc6_send_pdu(
             vmac_src = Device_Object_Instance_Number();
             mtu_len = bvlc6_encode_distribute_broadcast_to_network(
                 mtu, sizeof(mtu), vmac_src, pdu, pdu_len);
-            PRINTF("BVLC6: Sent Distribute-Broadcast-to-Network.\n");
+            log_debug("BVLC6: Sent Distribute-Broadcast-to-Network");
         } else {
             bip6_get_broadcast_addr(&bvlc_dest);
             vmac_src = Device_Object_Instance_Number();
             mtu_len = bvlc6_encode_original_broadcast(
                 mtu, sizeof(mtu), vmac_src, pdu, pdu_len);
-            PRINTF("BVLC6: Sent Original-Broadcast-NPDU.\n");
+            log_debug("BVLC6: Sent Original-Broadcast-NPDU");
         }
     } else if ((dest->net > 0) && (dest->len == 0)) {
         /* net > 0 and net < 65535 are network specific broadcast if len = 0 */
@@ -330,17 +335,17 @@ int bvlc6_send_pdu(
         vmac_src = Device_Object_Instance_Number();
         mtu_len = bvlc6_encode_original_broadcast(
             mtu, sizeof(mtu), vmac_src, pdu, pdu_len);
-        PRINTF("BVLC6: Sent Original-Broadcast-NPDU.\n");
+        log_debug("BVLC6: Sent Original-Broadcast-NPDU");
     } else if (dest->mac_len == 3) {
         /* valid unicast */
         bbmd6_address_from_bacnet_address(&bvlc_dest, &vmac_dst, dest);
-        PRINTF("BVLC6: Sending to VMAC %lu.\n", (unsigned long)vmac_dst);
+        log_debug("BVLC6: Sending to VMAC %lu", (unsigned long)vmac_dst);
         vmac_src = Device_Object_Instance_Number();
         mtu_len = bvlc6_encode_original_unicast(
             mtu, sizeof(mtu), vmac_src, vmac_dst, pdu, pdu_len);
-        PRINTF("BVLC6: Sent Original-Unicast-NPDU.\n");
+        log_debug("BVLC6: Sent Original-Unicast-NPDU");
     } else {
-        PRINTF("BVLC6: Send failure. Invalid Address.\n");
+        log_err("BVLC6: Send failure. Invalid Address");
         return -1;
     }
 
@@ -529,7 +534,7 @@ static void bbmd6_virtual_address_resolution_handler(
     uint32_t vmac_me = 0;
 
     if (addr && pdu) {
-        PRINTF("BIP6: Received Virtual-Address-Resolution.\n");
+        log_debug("BIP6: Received Virtual-Address-Resolution");
         if (bbmd6_address_match_self(addr)) {
             /* ignore messages from my IPv6 address */
         } else {
@@ -563,7 +568,7 @@ static void bbmd6_virtual_address_resolution_ack_handler(
     uint32_t vmac_dst = 0;
 
     if (addr && pdu) {
-        PRINTF("BIP6: Received Virtual-Address-Resolution-ACK.\n");
+        log_debug("BIP6: Received Virtual-Address-Resolution-ACK");
         if (bbmd6_address_match_self(addr)) {
             /* ignore messages from my IPv6 address */
         } else {
@@ -592,7 +597,7 @@ static void bbmd6_address_resolution_handler(
     uint32_t vmac_me = 0;
 
     if (addr && pdu) {
-        PRINTF("BIP6: Received Address-Resolution.\n");
+        log_debug("BIP6: Received Address-Resolution");
         if (bbmd6_address_match_self(addr)) {
             /* ignore messages from my IPv6 address */
         } else {
@@ -627,7 +632,7 @@ static void bbmd6_address_resolution_ack_handler(
     uint32_t vmac_dst = 0;
 
     if (addr && pdu) {
-        PRINTF("BIP6: Received Address-Resolution-ACK.\n");
+        log_debug("BIP6: Received Address-Resolution-ACK");
         if (bbmd6_address_match_self(addr)) {
             /* ignore messages from my IPv6 address */
         } else {
@@ -689,8 +694,8 @@ int bvlc6_bbmd_disabled_handler(
                        incoming messages. */
                     bbmd6_add_vmac(vmac_src, addr);
                     bvlc6_vmac_address_set(src, vmac_src);
-                    PRINTF(
-                        "BIP6: Received Result Code=%d\n", BVLC6_Result_Code);
+                    log_debug(
+                        "BIP6: Received Result Code=%d", BVLC6_Result_Code);
                 }
                 break;
             case BVLC6_REGISTER_FOREIGN_DEVICE:
@@ -708,10 +713,10 @@ int bvlc6_bbmd_disabled_handler(
             case BVLC6_ORIGINAL_UNICAST_NPDU:
                 /* This message is used to send directed NPDUs to
                    another B/IPv6 node or router. */
-                PRINTF("BIP6: Received Original-Unicast-NPDU.\n");
+                log_debug("BIP6: Received Original-Unicast-NPDU");
                 if (bbmd6_address_match_self(addr)) {
                     /* ignore messages from my IPv6 address */
-                    PRINTF("BIP6: Original-Unicast-NPDU is me!.\n");
+                    log_debug("BIP6: Original-Unicast-NPDU is me!");
                 } else {
                     function_len = bvlc6_decode_original_unicast(
                         pdu, pdu_len, &vmac_src, &vmac_dst, NULL, 0, &npdu_len);
@@ -724,22 +729,22 @@ int bvlc6_bbmd_disabled_handler(
                             bvlc6_vmac_address_set(src, vmac_src);
                             offset = header_len + (function_len - npdu_len);
                         } else {
-                            PRINTF("BIP6: Original-Unicast-NPDU: "
-                                   "VMAC is not me!\n");
+                            log_debug("BIP6: Original-Unicast-NPDU: "
+                                      "VMAC is not me!");
                         }
                     } else {
-                        PRINTF(
-                            "BIP6: Original-Unicast-NPDU: Unable to decode!\n");
+                        log_debug(
+                            "BIP6: Original-Unicast-NPDU: Unable to decode!");
                     }
                 }
                 break;
             case BVLC6_ORIGINAL_BROADCAST_NPDU:
-                PRINTF("BIP6: Received Original-Broadcast-NPDU.\n");
+                log_debug("BIP6: Received Original-Broadcast-NPDU");
                 if (Remote_BBMD.port) {
-                    PRINTF("BIP6: Ignore Original-Broadcast-NPDU when "
-                           "registered as a foreign device.\n");
+                    log_debug("BIP6: Ignore Original-Broadcast-NPDU when "
+                              "registered as a foreign device");
                 } else if (bbmd6_address_match_self(addr)) {
-                    PRINTF("BIP6: Ignore Original-Broadcast-NPDU from self!\n");
+                    log_debug("BIP6: Ignore Original-Broadcast-NPDU from self!");
                 } else {
                     function_len = bvlc6_decode_original_broadcast(
                         pdu, pdu_len, &vmac_src, NULL, 0, &npdu_len);
@@ -758,20 +763,20 @@ int bvlc6_bbmd_disabled_handler(
                         npdu = &mtu[offset];
                         if (npdu_confirmed_service(npdu, npdu_len)) {
                             offset = 0;
-                            PRINTF("BIP6: Original-Broadcast-NPDU: "
-                                   "Confirmed Service! Discard!");
+                            log_debug("BIP6: Original-Broadcast-NPDU: "
+                                      "Confirmed Service! Discard!");
                         }
                     } else {
-                        PRINTF("BIP6: Original-Broadcast-NPDU: Unable to "
-                               "decode!\n");
+                        log_debug("BIP6: Original-Broadcast-NPDU: Unable to "
+                                  "decode!");
                     }
                 }
                 break;
             case BVLC6_FORWARDED_NPDU:
-                PRINTF("BIP6: Received Forwarded-NPDU.\n");
+                log_debug("BIP6: Received Forwarded-NPDU");
                 if (bbmd6_address_match_self(addr)) {
                     /* ignore messages from my IPv6 address */
-                    PRINTF("BIP6: Forwarded-NPDU is me!\n");
+                    log_debug("BIP6: Forwarded-NPDU is me!");
                 } else {
                     function_len = bvlc6_decode_forwarded_npdu(
                         pdu, pdu_len, &vmac_src, &fwd_address, NULL, 0,
@@ -784,7 +789,7 @@ int bvlc6_bbmd_disabled_handler(
                         bvlc6_vmac_address_set(src, vmac_src);
                         offset = header_len + (function_len - npdu_len);
                     } else {
-                        PRINTF("BIP6: Forwarded-NPDU: Unable to decode!\n");
+                        log_debug("BIP6: Forwarded-NPDU: Unable to decode!");
                     }
                 }
                 break;
@@ -813,7 +818,7 @@ int bvlc6_bbmd_disabled_handler(
         if (send_result) {
             vmac_src = Device_Object_Instance_Number();
             bvlc6_send_result(addr, vmac_src, result_code);
-            PRINTF("BIP6: sent result code=%d\n", result_code);
+            log_debug("BIP6: sent result code=%d", result_code);
         }
     }
 
@@ -873,8 +878,8 @@ int bvlc6_bbmd_enabled_handler(
                        incoming messages. */
                     bbmd6_add_vmac(vmac_src, addr);
                     bvlc6_vmac_address_set(src, vmac_src);
-                    PRINTF(
-                        "BIP6: Received Result Code=%d\n", BVLC6_Result_Code);
+                    log_debug(
+                        "BIP6: Received Result Code=%d", BVLC6_Result_Code);
                 }
                 break;
             case BVLC6_REGISTER_FOREIGN_DEVICE:
@@ -892,9 +897,9 @@ int bvlc6_bbmd_enabled_handler(
             case BVLC6_ORIGINAL_UNICAST_NPDU:
                 /* This message is used to send directed NPDUs to
                    another B/IPv6 node or router. */
-                PRINTF("BIP6: Received Original-Unicast-NPDU.\n");
+                log_debug("BIP6: Received Original-Unicast-NPDU");
                 if (bbmd6_address_match_self(addr)) {
-                    PRINTF("BIP6: Dropped Original-Unicast-NPDU.\n");
+                    log_debug("BIP6: Dropped Original-Unicast-NPDU");
                     /* ignore messages from my IPv6 address */
                     offset = 0;
                 } else {
@@ -913,10 +918,10 @@ int bvlc6_bbmd_enabled_handler(
                 }
                 break;
             case BVLC6_ORIGINAL_BROADCAST_NPDU:
-                PRINTF("BIP6: Received Original-Broadcast-NPDU.\n");
+                log_debug("BIP6: Received Original-Broadcast-NPDU");
                 if (Remote_BBMD.port) {
-                    PRINTF("BIP6: Ignore Original-Broadcast-NPDU when "
-                           "registered as a foreign device.\n");
+                    log_debug("BIP6: Ignore Original-Broadcast-NPDU when "
+                              "registered as a foreign device");
                     break;
                 }
                 function_len = bvlc6_decode_original_broadcast(
@@ -931,8 +936,8 @@ int bvlc6_bbmd_enabled_handler(
                        network layer. */
                     if (npdu_confirmed_service(npdu, npdu_len)) {
                         offset = 0;
-                        PRINTF("BIP6: Original-Broadcast-NPDU: "
-                               "Confirmed Service! Discard!");
+                        log_debug("BIP6: Original-Broadcast-NPDU: "
+                                  "Confirmed Service! Discard!");
                     } else {
                         /*  Upon receipt of a BVLL Original-Broadcast-NPDU
                             message from the local multicast domain, a BBMD
@@ -957,7 +962,7 @@ int bvlc6_bbmd_enabled_handler(
                 }
                 break;
             case BVLC6_FORWARDED_NPDU:
-                PRINTF("BIP6: Received Forwarded-NPDU.\n");
+                log_debug("BIP6: Received Forwarded-NPDU");
                 function_len = bvlc6_decode_forwarded_npdu(
                     pdu, pdu_len, &vmac_src, &fwd_address, NULL, 0, &npdu_len);
                 if (function_len) {
@@ -1016,7 +1021,7 @@ int bvlc6_bbmd_enabled_handler(
         if (send_result) {
             vmac_src = Device_Object_Instance_Number();
             bvlc6_send_result(addr, vmac_src, result_code);
-            PRINTF("BIP6: sent result code=%d\n", result_code);
+            log_debug("BIP6: sent result code=%d", result_code);
         }
     }
 

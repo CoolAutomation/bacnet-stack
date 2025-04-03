@@ -18,6 +18,9 @@
 #include "bacnet/basic/sys/debug.h"
 #include "bacnet/basic/services.h"
 
+#define LOG_MODULE "basic/service/s_cevent"
+#include "bacnet/basic/sys/log.h"
+
 /** Sends an Confirmed Alarm/Event Notification.
  * @ingroup EVNOTFCN
  *
@@ -67,16 +70,15 @@ uint8_t Send_CEvent_Notify_Address(
                 invoke_id, dest, &npdu_data, pdu, (uint16_t)pdu_len);
             bytes_sent = datalink_send_pdu(dest, &npdu_data, pdu, pdu_len);
             if (bytes_sent <= 0) {
-                debug_perror(
+                log_perror(
                     "Failed to Send ConfirmedEventNotification Request");
             }
         } else {
             tsm_free_invoke_id(invoke_id);
             invoke_id = 0;
-            debug_fprintf(
-                stderr,
+            log_err(
                 "Failed to Send ConfirmedEventNotification Request "
-                "(exceeds destination maximum APDU)!\n");
+                "(exceeds destination maximum APDU)!");
         }
     }
 
