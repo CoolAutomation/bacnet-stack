@@ -8,7 +8,6 @@
  */
 #include <stddef.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 /* BACnet Stack defines - first */
 #include "bacnet/bacdef.h"
@@ -34,6 +33,9 @@
 #include "bacnet/datalink/bsc/bsc-datalink.h"
 #include "bacnet/datalink/bsc/bsc-event.h"
 #endif
+
+#define LOG_MODULE "datalink/dlenv"
+#include "bacnet/basic/sys/log.h"
 
 /* enable debugging */
 static bool Datalink_Debug;
@@ -170,9 +172,8 @@ static int bbmd_register_as_foreign_device(void)
     }
     if (BBMD_Address_Valid) {
         if (Datalink_Debug) {
-            fprintf(
-                stderr,
-                "Registering with BBMD at %u.%u.%u.%u:%u for %u seconds\n",
+            log_info(
+                "Registering with BBMD at %u.%u.%u.%u:%u for %u seconds",
                 (unsigned)BBMD_Address.address[0],
                 (unsigned)BBMD_Address.address[1],
                 (unsigned)BBMD_Address.address[2],
@@ -181,8 +182,8 @@ static int bbmd_register_as_foreign_device(void)
         }
         retval = bvlc_register_with_bbmd(&BBMD_Address, BBMD_TTL_Seconds);
         if (retval < 0) {
-            fprintf(
-                stderr, "FAILED to Register with BBMD at %u.%u.%u.%u:%u\n",
+            log_err(
+                "FAILED to Register with BBMD at %u.%u.%u.%u:%u",
                 (unsigned)BBMD_Address.address[0],
                 (unsigned)BBMD_Address.address[1],
                 (unsigned)BBMD_Address.address[2],
@@ -200,8 +201,8 @@ static int bbmd_register_as_foreign_device(void)
                     bip_get_addr_by_name(pEnv, &BBMD_Table_Entry.dest_address);
                 if (entry_number == 1) {
                     if (Datalink_Debug) {
-                        fprintf(
-                            stderr, "BBMD 1 address overridden %s=%s!\n",
+                        log_info(
+                            "BBMD 1 address overridden %s=%s!",
                             bbmd_env, pEnv);
                     }
                 }
@@ -219,8 +220,8 @@ static int bbmd_register_as_foreign_device(void)
                     bdt_entry_port = strtol(pEnv, NULL, 0);
                     if (entry_number == 1) {
                         if (Datalink_Debug) {
-                            fprintf(
-                                stderr, "BBMD 1 port overridden %s=%s!\n",
+                            log_info(
+                                "BBMD 1 port overridden %s=%s!",
                                 bbmd_env, pEnv);
                         }
                     }
@@ -248,8 +249,8 @@ static int bbmd_register_as_foreign_device(void)
                 bvlc_broadcast_distribution_table_entry_append(
                     bvlc_bdt_list(), &BBMD_Table_Entry);
                 if (Datalink_Debug) {
-                    fprintf(
-                        stderr, "BBMD %4u: %u.%u.%u.%u:%u %u.%u.%u.%u\n",
+                    log_info(
+                        "BBMD %4u: %u.%u.%u.%u:%u %u.%u.%u.%u",
                         entry_number,
                         (unsigned)BBMD_Table_Entry.dest_address.address[0],
                         (unsigned)BBMD_Table_Entry.dest_address.address[1],
@@ -316,14 +317,14 @@ static int bbmd6_register_as_foreign_device(void)
     pEnv = getenv("BACNET_BBMD6_ADDRESS");
     if (bvlc6_address_from_ascii(pEnv, &bip6_addr)) {
         if (Datalink_Debug) {
-            fprintf(
-                stderr, "Registering with BBMD6 at %s for %u seconds\n", pEnv,
+            log_info(
+                "Registering with BBMD6 at %s for %u seconds", pEnv,
                 (unsigned)bip6_port, (unsigned)BBMD_TTL_Seconds);
         }
         retval = bvlc6_register_with_bbmd(&bip6_addr, BBMD_TTL_Seconds);
         if (retval < 0) {
-            fprintf(
-                stderr, "FAILED to Register with BBMD6 at %s:%u\n", pEnv,
+            log_err(
+                "FAILED to Register with BBMD6 at %s:%u", pEnv,
                 (unsigned)BBMD_Address.port);
         }
         BBMD_Timer_Seconds = BBMD_TTL_Seconds;
@@ -375,8 +376,8 @@ void dlenv_network_port_init(void)
     bip_get_addr(&addr);
     prefix = bip_get_subnet_prefix();
     if (Datalink_Debug) {
-        fprintf(
-            stderr, "BIP: Setting Network Port %lu address %u.%u.%u.%u:%u/%u\n",
+        log_info(
+            "BIP: Setting Network Port %lu address %u.%u.%u.%u:%u/%u",
             (unsigned long)instance, (unsigned)addr.address[0],
             (unsigned)addr.address[1], (unsigned)addr.address[2],
             (unsigned)addr.address[3], (unsigned)addr.port, (unsigned)prefix);

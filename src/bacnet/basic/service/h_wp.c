@@ -26,6 +26,9 @@
 #include "bacnet/basic/sys/debug.h"
 #include "bacnet/datalink/datalink.h"
 
+#define LOG_MODULE "basic/service/h_wp"
+#include "bacnet/basic/sys/log.h"
+
 /** @file h_wp.c  Handles Write Property requests. */
 
 /**
@@ -94,26 +97,25 @@ void handler_write_property(
     npdu_encode_npdu_data(&npdu_data, false, service_data->priority);
     pdu_len = npdu_encode_pdu(
         &Handler_Transmit_Buffer[0], src, &my_address, &npdu_data);
-    debug_print("WP: Received Request!\n");
+    log_debug("WP: Received Request!");
     if (service_len == 0) {
         len = reject_encode_apdu(
             &Handler_Transmit_Buffer[pdu_len], service_data->invoke_id,
             REJECT_REASON_MISSING_REQUIRED_PARAMETER);
-        debug_print("WP: Missing Required Parameter. Sending Reject!\n");
+        log_info("WP: Missing Required Parameter. Sending Reject!");
         bcontinue = false;
     } else if (service_data->segmented_message) {
         len = abort_encode_apdu(
             &Handler_Transmit_Buffer[pdu_len], service_data->invoke_id,
             ABORT_REASON_SEGMENTATION_NOT_SUPPORTED, true);
-        debug_print("WP: Segmented message.  Sending Abort!\n");
+        log_info("WP: Segmented message.  Sending Abort!");
         bcontinue = false;
     }
     if (bcontinue) {
         /* decode the service request only */
         len = wp_decode_service_request(service_request, service_len, &wp_data);
         if (len > 0) {
-            debug_fprintf(
-                stderr,
+            log_debug(
                 "WP: type=%lu instance=%lu property=%lu priority=%lu "
                 "index=%ld\n",
                 (unsigned long)wp_data.object_type,
@@ -121,14 +123,14 @@ void handler_write_property(
                 (unsigned long)wp_data.object_property,
                 (unsigned long)wp_data.priority, (long)wp_data.array_index);
         } else {
-            debug_print("WP: Unable to decode Request!\n");
+            log_warn("WP: Unable to decode Request!");
         }
         /* bad decoding or something we didn't understand - send an abort */
         if (len <= 0) {
             len = abort_encode_apdu(
                 &Handler_Transmit_Buffer[pdu_len], service_data->invoke_id,
                 ABORT_REASON_OTHER, true);
-            debug_print("WP: Bad Encoding. Sending Abort!\n");
+            log_warn("WP: Bad Encoding. Sending Abort!");
             bcontinue = false;
         }
         if (bcontinue) {
@@ -147,13 +149,13 @@ void handler_write_property(
                 len = encode_simple_ack(
                     &Handler_Transmit_Buffer[pdu_len], service_data->invoke_id,
                     SERVICE_CONFIRMED_WRITE_PROPERTY);
-                debug_print("WP: Sending Simple Ack!\n");
+                log_debug("WP: Sending Simple Ack!");
             } else {
                 len = bacerror_encode_apdu(
                     &Handler_Transmit_Buffer[pdu_len], service_data->invoke_id,
                     SERVICE_CONFIRMED_WRITE_PROPERTY, wp_data.error_class,
                     wp_data.error_code);
-                debug_print("WP: Sending Error!\n");
+                log_debug("WP: Sending Error!");
             }
         }
     }
@@ -162,7 +164,7 @@ void handler_write_property(
     bytes_sent = datalink_send_pdu(
         src, &npdu_data, &Handler_Transmit_Buffer[0], pdu_len);
     if (bytes_sent <= 0) {
-        debug_perror("WP: Failed to send PDU");
+        log_err("WP: Failed to send PDU");
     }
 
     return;

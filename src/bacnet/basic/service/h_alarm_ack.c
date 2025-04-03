@@ -29,6 +29,9 @@
 #include "bacnet/basic/services.h"
 #include "bacnet/datalink/datalink.h"
 
+#define LOG_MODULE "basic/service/h_alarm_ack"
+#include "bacnet/basic/sys/log.h"
+
 /** @file h_alarm_ack.c  Handles Alarm Acknowledgment. */
 
 static alarm_ack_function Alarm_Ack[MAX_BACNET_OBJECT_TYPE];
@@ -81,33 +84,32 @@ void handler_alarm_ack(
         len = reject_encode_apdu(
             &Handler_Transmit_Buffer[pdu_len], service_data->invoke_id,
             REJECT_REASON_MISSING_REQUIRED_PARAMETER);
-        debug_print("Alarm Ack: Missing Required Parameter. Sending Reject!\n");
+        log_debug("Alarm Ack: Missing Required Parameter. Sending Reject!");
         goto AA_ABORT;
     } else if (service_data->segmented_message) {
         /* we don't support segmentation - send an abort */
         len = abort_encode_apdu(
             &Handler_Transmit_Buffer[pdu_len], service_data->invoke_id,
             ABORT_REASON_SEGMENTATION_NOT_SUPPORTED, true);
-        debug_print("Alarm Ack: Segmented message.  Sending Abort!\n");
+        log_debug("Alarm Ack: Segmented message.  Sending Abort!");
         goto AA_ABORT;
     }
 
     len = alarm_ack_decode_service_request(service_request, service_len, &data);
     if (len <= 0) {
-        debug_print("Alarm Ack: Unable to decode Request!\n");
+        log_warn("Alarm Ack: Unable to decode Request!");
     }
     if (len < 0) {
         /* bad decoding - send an abort */
         len = abort_encode_apdu(
             &Handler_Transmit_Buffer[pdu_len], service_data->invoke_id,
             ABORT_REASON_OTHER, true);
-        debug_print("Alarm Ack: Bad Encoding.  Sending Abort!\n");
+        log_warn("Alarm Ack: Bad Encoding.  Sending Abort!");
         goto AA_ABORT;
     }
-    debug_fprintf(
-        stderr,
+    log_debug(
         "Alarm Ack Operation: Received acknowledge for object id (%d, %lu) "
-        "from %s for process id %lu \n",
+        "from %s for process id %lu",
         data.eventObjectIdentifier.type,
         (unsigned long)data.eventObjectIdentifier.instance,
         data.ackSource.value, (unsigned long)data.ackProcessIdentifier);
@@ -126,7 +128,7 @@ void handler_alarm_ack(
                 len = encode_simple_ack(
                     &Handler_Transmit_Buffer[pdu_len], service_data->invoke_id,
                     SERVICE_CONFIRMED_ACKNOWLEDGE_ALARM);
-                debug_print("Alarm Acknowledge: Sending Simple Ack!\n");
+                log_debug("Alarm Acknowledge: Sending Simple Ack!");
                 break;
 
             case -1:
@@ -134,8 +136,8 @@ void handler_alarm_ack(
                     &Handler_Transmit_Buffer[pdu_len], service_data->invoke_id,
                     SERVICE_CONFIRMED_ACKNOWLEDGE_ALARM, ERROR_CLASS_OBJECT,
                     error_code);
-                debug_fprintf(
-                    stderr, "Alarm Acknowledge: error %s!\n",
+                log_debug(
+                    "Alarm Acknowledge: error %s!",
                     bactext_error_code_name(error_code));
                 break;
 
@@ -143,7 +145,7 @@ void handler_alarm_ack(
                 len = abort_encode_apdu(
                     &Handler_Transmit_Buffer[pdu_len], service_data->invoke_id,
                     ABORT_REASON_OTHER, true);
-                debug_print("Alarm Acknowledge: abort other!\n");
+                log_debug("Alarm Acknowledge: abort other!");
                 break;
         }
     } else {
@@ -151,7 +153,7 @@ void handler_alarm_ack(
             &Handler_Transmit_Buffer[pdu_len], service_data->invoke_id,
             SERVICE_CONFIRMED_ACKNOWLEDGE_ALARM, ERROR_CLASS_OBJECT,
             ERROR_CODE_NO_ALARM_CONFIGURED);
-        debug_print("Alarm Acknowledge: No Alarm Configured!\n");
+        log_debug("Alarm Acknowledge: No Alarm Configured!");
     }
 
 AA_ABORT:
@@ -159,7 +161,7 @@ AA_ABORT:
     bytes_sent = datalink_send_pdu(
         src, &npdu_data, &Handler_Transmit_Buffer[0], pdu_len);
     if (bytes_sent <= 0) {
-        debug_perror("Alarm Acknowledge: Failed to send PDU");
+        log_perror("Alarm Acknowledge: Failed to send PDU");
     }
 
     return;

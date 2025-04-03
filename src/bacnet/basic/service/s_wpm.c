@@ -24,6 +24,9 @@
 #include "bacnet/basic/tsm/tsm.h"
 #include "bacnet/datalink/datalink.h"
 
+#define LOG_MODULE "basic/service/s_wpm"
+#include "bacnet/basic/sys/log.h"
+
 /**
  * @brief Sends a Write Property Multiple request.
  * @ingroup BIBB-DS-WPM-A
@@ -83,15 +86,14 @@ uint8_t Send_Write_Property_Multiple_Request(
                 invoke_id, &dest, &npdu_data, &pdu[0], (uint16_t)pdu_len);
             bytes_sent = datalink_send_pdu(&dest, &npdu_data, &pdu[0], pdu_len);
             if (bytes_sent <= 0) {
-                debug_perror("Failed to Send WritePropertyMultiple Request");
+                log_perror("Failed to Send WritePropertyMultiple Request");
             }
         } else {
             tsm_free_invoke_id(invoke_id);
             invoke_id = 0;
-            debug_fprintf(
-                stderr,
+            log_err(
                 "Failed to Send WritePropertyMultiple Request "
-                "(exceeds destination maximum APDU)!\n");
+                "(exceeds destination maximum APDU)!");
         }
     }
 

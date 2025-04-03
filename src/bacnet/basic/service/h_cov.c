@@ -31,6 +31,9 @@
 #include "bacnet/basic/sys/debug.h"
 #include "bacnet/datalink/datalink.h"
 
+#define LOG_MODULE "basic/service/h_cov"
+#include "bacnet/basic/sys/log.h"
+
 #ifndef MAX_COV_PROPERTIES
 #define MAX_COV_PROPERTIES 2
 #endif
@@ -458,17 +461,13 @@ static bool cov_send_request(
     if (!dcc_communication_enabled()) {
         return status;
     }
-#if PRINT_ENABLED
-    fprintf(stderr, "COVnotification: requested\n");
-#endif
+    log_debug("COVnotification: requested");
     if (!cov_subscription) {
         return status;
     }
     dest = cov_address_get(cov_subscription->dest_index);
     if (!dest) {
-#if PRINT_ENABLED
-        fprintf(stderr, "COVnotification: dest not found!\n");
-#endif
+        log_debug("COVnotification: dest not found!");
         return status;
     }
     datalink_get_my_address(&my_address);
@@ -513,9 +512,7 @@ static bool cov_send_request(
         dest, &npdu_data, &Handler_Transmit_Buffer[0], pdu_len);
     if (bytes_sent > 0) {
         status = true;
-#if PRINT_ENABLED
-        fprintf(stderr, "COVnotification: Sent!\n");
-#endif
+        log_debug("COVnotification: Sent!");
     }
 
 COV_FAILED:
@@ -530,29 +527,22 @@ static void cov_lifetime_expiration_handler(
         /* handle lifetime expiration */
         if (lifetime_seconds >= elapsed_seconds) {
             COV_Subscriptions[index].lifetime -= elapsed_seconds;
-#if 0
-            fprintf(stderr, "COVtimer: subscription[%d].lifetime=%lu\n", index,
+            log_trace("COVtimer: subscription[%d].lifetime=%lu", index,
                 (unsigned long) COV_Subscriptions[index].lifetime);
-#endif
         } else {
             COV_Subscriptions[index].lifetime = 0;
         }
         if (COV_Subscriptions[index].lifetime == 0) {
             /* expire the subscription */
-#if PRINT_ENABLED
-            fprintf(
-                stderr, "COVtimer: PID=%u ",
-                COV_Subscriptions[index].subscriberProcessIdentifier);
-            fprintf(
-                stderr, "%s %u ",
+            log_debug(
+                "COVtimer: PID=%u ",
+                "%s %u ",
+                "time remaining=%u seconds",
+                COV_Subscriptions[index].subscriberProcessIdentifier,
                 bactext_object_type_name(
                     COV_Subscriptions[index].monitoredObjectIdentifier.type),
-                COV_Subscriptions[index].monitoredObjectIdentifier.instance);
-            fprintf(
-                stderr, "time remaining=%u seconds ",
+                COV_Subscriptions[index].monitoredObjectIdentifier.instance,
                 COV_Subscriptions[index].lifetime);
-            fprintf(stderr, "\n");
-#endif
             /* initialize with invalid COV address */
             COV_Subscriptions[index].flag.valid = false;
             COV_Subscriptions[index].dest_index = MAX_COV_ADDRESSES;
@@ -640,9 +630,7 @@ bool handler_cov_fsm(void)
                 status = Device_COV(object_type, object_instance);
                 if (status) {
                     COV_Subscriptions[index].flag.send_requested = true;
-#if PRINT_ENABLED
-                    fprintf(stderr, "COVtask: Marking...\n");
-#endif
+                    log_debug("COVtask: Marking...");
                 }
             }
             index++;
@@ -706,9 +694,7 @@ bool handler_cov_fsm(void)
                                       .monitoredObjectIdentifier.type;
                     object_instance = COV_Subscriptions[index]
                                           .monitoredObjectIdentifier.instance;
-#if PRINT_ENABLED
-                    fprintf(stderr, "COVtask: Sending...\n");
-#endif
+                    log_debug("COVtask: Sending...");
                     /* configure the linked list for the two properties */
                     bacapp_property_value_list_init(
                         &value_list[0], MAX_COV_PROPERTIES);
@@ -827,18 +813,18 @@ void handler_cov_subscribe(
     if (service_len == 0) {
         len = BACNET_STATUS_REJECT;
         cov_data.error_code = ERROR_CODE_REJECT_MISSING_REQUIRED_PARAMETER;
-        debug_print("CCOV: Missing Required Parameter. Sending Reject!\n");
+        log_debug("CCOV: Missing Required Parameter. Sending Reject!");
         error = true;
     } else if (service_data->segmented_message) {
         /* we don't support segmentation - send an abort */
         len = BACNET_STATUS_ABORT;
-        debug_print("SubscribeCOV: Segmented message.  Sending Abort!\n");
+        log_debug("SubscribeCOV: Segmented message.  Sending Abort!");
         error = true;
     } else {
         len = cov_subscribe_decode_service_request(
             service_request, service_len, &cov_data);
         if (len <= 0) {
-            debug_print("SubscribeCOV: Unable to decode Request!\n");
+            log_debug("SubscribeCOV: Unable to decode Request!");
         }
         if (len < 0) {
             error = true;
@@ -851,11 +837,11 @@ void handler_cov_subscribe(
                 apdu_len = encode_simple_ack(
                     &Handler_Transmit_Buffer[npdu_len], service_data->invoke_id,
                     SERVICE_CONFIRMED_SUBSCRIBE_COV);
-                debug_print("SubscribeCOV: Sending Simple Ack!\n");
+                log_debug("SubscribeCOV: Sending Simple Ack!");
             } else {
                 len = BACNET_STATUS_ERROR;
                 error = true;
-                debug_print("SubscribeCOV: Sending Error!\n");
+                log_debug("SubscribeCOV: Sending Error!");
             }
         }
     }
@@ -865,25 +851,25 @@ void handler_cov_subscribe(
             apdu_len = abort_encode_apdu(
                 &Handler_Transmit_Buffer[npdu_len], service_data->invoke_id,
                 abort_convert_error_code(cov_data.error_code), true);
-            debug_print("SubscribeCOV: Sending Abort!\n");
+            log_debug("SubscribeCOV: Sending Abort!");
         } else if (len == BACNET_STATUS_ERROR) {
             apdu_len = bacerror_encode_apdu(
                 &Handler_Transmit_Buffer[npdu_len], service_data->invoke_id,
                 SERVICE_CONFIRMED_SUBSCRIBE_COV, cov_data.error_class,
                 cov_data.error_code);
-            debug_print("SubscribeCOV: Sending Error!\n");
+            log_debug("SubscribeCOV: Sending Error!");
         } else if (len == BACNET_STATUS_REJECT) {
             apdu_len = reject_encode_apdu(
                 &Handler_Transmit_Buffer[npdu_len], service_data->invoke_id,
                 reject_convert_error_code(cov_data.error_code));
-            debug_print("SubscribeCOV: Sending Reject!\n");
+            log_debug("SubscribeCOV: Sending Reject!");
         }
     }
     pdu_len = npdu_len + apdu_len;
     bytes_sent = datalink_send_pdu(
         src, &npdu_data, &Handler_Transmit_Buffer[0], pdu_len);
     if (bytes_sent <= 0) {
-        debug_perror("SubscribeCOV: Failed to send PDU");
+        log_perror("SubscribeCOV: Failed to send PDU");
     }
 
     return;

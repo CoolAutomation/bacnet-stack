@@ -24,6 +24,9 @@
 #include "bacnet/basic/sys/debug.h"
 #include "bacnet/datalink/datalink.h"
 
+#define LOG_MODULE "basic/service/h_dcc"
+#include "bacnet/basic/sys/log.h"
+
 /* The byte length of a UTF-8 character can vary.
  * In UTF-8, the number of bytes used to represent a character can range from 1
  * to 4 bytes. Commonly used characters in the ASCII set are represented by 1
@@ -100,30 +103,29 @@ void handler_device_communication_control(
     npdu_encode_npdu_data(&npdu_data, false, service_data->priority);
     pdu_len = npdu_encode_pdu(
         &Handler_Transmit_Buffer[0], src, &my_address, &npdu_data);
-    debug_print("DeviceCommunicationControl!\n");
+    log_info("DeviceCommunicationControl!");
     if (service_len == 0) {
         len = reject_encode_apdu(
             &Handler_Transmit_Buffer[pdu_len], service_data->invoke_id,
             REJECT_REASON_MISSING_REQUIRED_PARAMETER);
-        debug_print("DeviceCommunicationControl: "
-                    "Missing Required Parameter. Sending Reject!\n");
+        log_info("DeviceCommunicationControl: "
+                 "Missing Required Parameter. Sending Reject!");
         goto DCC_FAILURE;
     } else if (service_data->segmented_message) {
         len = abort_encode_apdu(
             &Handler_Transmit_Buffer[pdu_len], service_data->invoke_id,
             ABORT_REASON_SEGMENTATION_NOT_SUPPORTED, true);
-        debug_print("DeviceCommunicationControl: "
-                    "Sending Abort - segmented message.\n");
+        log_info("DeviceCommunicationControl: "
+                 "Sending Abort - segmented message");
         goto DCC_FAILURE;
     }
     /* decode the service request only */
     len = dcc_decode_service_request(
         service_request, service_len, &timeDuration, &state, &password);
     if (len > 0) {
-        debug_fprintf(
-            stderr,
+        log_err(
             "DeviceCommunicationControl: "
-            "timeout=%u state=%u password=%s\n",
+            "timeout=%u state=%u password=%s",
             (unsigned)timeDuration, (unsigned)state,
             characterstring_value(&password));
     }
@@ -134,12 +136,12 @@ void handler_device_communication_control(
             len = abort_encode_apdu(
                 &Handler_Transmit_Buffer[pdu_len], service_data->invoke_id,
                 ABORT_REASON_OTHER, true);
-            debug_print("DCC: Sending Abort!\n");
+            log_info("DCC: Sending Abort!");
         } else if (len == BACNET_STATUS_REJECT) {
             len = reject_encode_apdu(
                 &Handler_Transmit_Buffer[pdu_len], service_data->invoke_id,
                 REJECT_REASON_PARAMETER_OUT_OF_RANGE);
-            debug_print("DCC: Sending Reject!\n");
+            log_info("DCC: Sending Reject!");
         }
         goto DCC_FAILURE;
     }
@@ -152,8 +154,8 @@ void handler_device_communication_control(
             &Handler_Transmit_Buffer[pdu_len], service_data->invoke_id,
             SERVICE_CONFIRMED_DEVICE_COMMUNICATION_CONTROL,
             ERROR_CLASS_SERVICES, ERROR_CODE_SERVICE_REQUEST_DENIED);
-        debug_print("DeviceCommunicationControl: "
-                    "Sending Error - DISABLE has been deprecated.\n");
+        log_info("DeviceCommunicationControl: "
+                 "Sending Error - DISABLE has been deprecated");
         goto DCC_FAILURE;
     }
 #endif
@@ -161,8 +163,8 @@ void handler_device_communication_control(
         len = reject_encode_apdu(
             &Handler_Transmit_Buffer[pdu_len], service_data->invoke_id,
             REJECT_REASON_UNDEFINED_ENUMERATION);
-        debug_print("DeviceCommunicationControl: "
-                    "Sending Reject - undefined enumeration\n");
+        log_info("DeviceCommunicationControl: "
+                 "Sending Reject - undefined enumeration");
     } else {
 #ifdef BAC_ROUTING
         /* Check to see if the current Device supports this service. */
@@ -178,16 +180,16 @@ void handler_device_communication_control(
             len = encode_simple_ack(
                 &Handler_Transmit_Buffer[pdu_len], service_data->invoke_id,
                 SERVICE_CONFIRMED_DEVICE_COMMUNICATION_CONTROL);
-            debug_print("DeviceCommunicationControl: "
-                        "Sending Simple Ack!\n");
+            log_info("DeviceCommunicationControl: "
+                     "Sending Simple Ack!");
             dcc_set_status_duration(state, timeDuration);
         } else {
             len = bacerror_encode_apdu(
                 &Handler_Transmit_Buffer[pdu_len], service_data->invoke_id,
                 SERVICE_CONFIRMED_DEVICE_COMMUNICATION_CONTROL,
                 ERROR_CLASS_SECURITY, ERROR_CODE_PASSWORD_FAILURE);
-            debug_print("DeviceCommunicationControl: "
-                        "Sending Error - password failure.\n");
+            log_info("DeviceCommunicationControl: "
+                     "Sending Error - password failure");
         }
     }
 DCC_FAILURE:
@@ -195,7 +197,7 @@ DCC_FAILURE:
     len = datalink_send_pdu(
         src, &npdu_data, &Handler_Transmit_Buffer[0], pdu_len);
     if (len <= 0) {
-        debug_perror("DeviceCommunicationControl: Failed to send PDU");
+        log_perror("DeviceCommunicationControl: Failed to send PDU");
     }
 
     return;

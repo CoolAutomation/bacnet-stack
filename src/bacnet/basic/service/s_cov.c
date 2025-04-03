@@ -24,6 +24,9 @@
 #include "bacnet/basic/sys/debug.h"
 #include "bacnet/datalink/datalink.h"
 
+#define LOG_MODULE "basic/service/s_cov"
+#include "bacnet/basic/sys/log.h"
+
 /** Encodes an Unconfirmed COV Notification.
  * @ingroup DSCOV
  *
@@ -148,15 +151,14 @@ uint8_t Send_COV_Subscribe(
             bytes_sent = datalink_send_pdu(
                 &dest, &npdu_data, &Handler_Transmit_Buffer[0], pdu_len);
             if (bytes_sent <= 0) {
-                debug_perror("Failed to Send SubscribeCOV Request");
+                log_perror("Failed to Send SubscribeCOV Request");
             }
         } else {
             tsm_free_invoke_id(invoke_id);
             invoke_id = 0;
-            debug_fprintf(
-                stderr,
+            log_err(
                 "Failed to Send SubscribeCOV Request "
-                "(exceeds destination maximum APDU)!\n");
+                "(exceeds destination maximum APDU)!");
         }
     }
 
