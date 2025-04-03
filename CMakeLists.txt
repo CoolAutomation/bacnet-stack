@@ -529,6 +529,8 @@ add_library(${PROJECT_NAME}
   src/bacnet/basic/sys/days.h
   src/bacnet/basic/sys/debug.c
   src/bacnet/basic/sys/debug.h
+  src/bacnet/basic/sys/log.c
+  src/bacnet/basic/sys/log.h
   src/bacnet/basic/sys/fifo.c
   src/bacnet/basic/sys/fifo.h
   src/bacnet/basic/sys/filename.c
