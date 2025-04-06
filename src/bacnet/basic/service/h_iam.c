@@ -17,6 +17,9 @@
 #include "bacnet/basic/services.h"
 #include "bacnet/basic/tsm/tsm.h"
 
+#define LOG_MODULE "basic/service/h_iam"
+#include "bacnet/basic/sys/log.h"
+
 /** Handler for I-Am responses.
  * Will add the responder to our cache, or update its binding.
  * @ingroup DMDDB
@@ -36,21 +39,15 @@ void handler_i_am_add(
     (void)service_len;
     len = iam_decode_service_request(
         service_request, &device_id, &max_apdu, &segmentation, &vendor_id);
-#if PRINT_ENABLED
-    fprintf(stderr, "Received I-Am Request");
-#endif
+    log_info("Received I-Am Request");
     if (len != -1) {
-#if PRINT_ENABLED
-        fprintf(
-            stderr, " from %lu, MAC = %d.%d.%d.%d.%d.%d\n",
+        log_info(
+            "Received I-Am Request from %lu, MAC = %d.%d.%d.%d.%d.%d",
             (unsigned long)device_id, src->mac[0], src->mac[1], src->mac[2],
             src->mac[3], src->mac[4], src->mac[5]);
-#endif
         address_add(device_id, max_apdu, src);
     } else {
-#if PRINT_ENABLED
-        fprintf(stderr, ", but unable to decode it.\n");
-#endif
+        log_err("Receive I-Am Request, but unable to decode it");
     }
 
     return;

@@ -29,6 +29,9 @@
 #include "bacnet/basic/sys/keylist.h"
 #include "bacnet/basic/tsm/tsm.h"
 
+#define LOG_MODULE "basic/object/bacfile"
+#include "bacnet/basic/sys/log.h"
+
 #ifndef FILE_RECORD_SIZE
 #define FILE_RECORD_SIZE MAX_OCTET_STRING_BYTES
 #endif
@@ -932,11 +935,9 @@ bool bacfile_read_ack_stream_data(
                     octetstring_value(
                         (BACNET_OCTET_STRING *)&data->fileData[0]),
                     octetstring_length(&data->fileData[0]), 1, pFile) != 1) {
-#if PRINT_ENABLED
-                fprintf(
-                    stderr, "Failed to write to %s (%lu)!\n", pFilename,
+                log_err(
+                    "Failed to write to %s (%lu)!", pFilename,
                     (unsigned long)instance);
-#endif
             }
             fclose(pFile);
         }
@@ -975,11 +976,9 @@ bool bacfile_read_ack_record_data(
                             (BACNET_OCTET_STRING *)&data->fileData[i]),
                         octetstring_length(&data->fileData[i]), 1,
                         pFile) != 1) {
-#if PRINT_ENABLED
-                    fprintf(
-                        stderr, "Failed to write to %s (%lu)!\n", pFilename,
+                    log_err(
+                        "Failed to write to %s (%lu)!", pFilename,
                         (unsigned long)instance);
-#endif
                 }
             }
             fclose(pFile);

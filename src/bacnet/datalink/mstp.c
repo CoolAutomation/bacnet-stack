@@ -34,6 +34,9 @@
 #include "bacnet/npdu.h"
 #include "bacnet/basic/sys/debug.h"
 
+#define LOG_MODULE "datalink/mstp"
+#include "bacnet/basic/sys/log.h"
+
 #if PRINT_ENABLED
 #undef PRINT_ENABLED_RECEIVE
 #undef PRINT_ENABLED_RECEIVE_DATA
@@ -293,9 +296,9 @@ void MSTP_Receive_Frame_FSM(struct mstp_port_struct_t *mstp_port)
 {
     MSTP_RECEIVE_STATE receive_state = mstp_port->receive_state;
 
-    printf_receive(
-        "MSTP Rx: State=%s Data=%02X hCRC=%02X Index=%u EC=%u DateLen=%u "
-        "Silence=%u\n",
+    log_trace(
+        "MSTP Rx: State=%s Data=%02X hCRC=%02X Index=%u EC=%u DataLen=%u "
+        "Silence=%u",
         mstptext_receive_state(mstp_port->receive_state),
         mstp_port->DataRegister, mstp_port->HeaderCRC, mstp_port->Index,
         mstp_port->EventCount, mstp_port->DataLength,
@@ -374,8 +377,8 @@ void MSTP_Receive_Frame_FSM(struct mstp_port_struct_t *mstp_port)
                 mstp_port->ReceivedInvalidFrame = true;
                 /* wait for the start of a frame. */
                 mstp_port->receive_state = MSTP_RECEIVE_STATE_IDLE;
-                printf_receive_error(
-                    "MSTP: Rx Header: SilenceTimer %u > %d\n",
+                log_warn(
+                    "MSTP: Rx Header: SilenceTimer %u > %d",
                     (unsigned)mstp_port->SilenceTimer((void *)mstp_port),
                     mstp_port->Tframe_abort);
             } else if (mstp_port->ReceiveError == true) {
@@ -386,7 +389,7 @@ void MSTP_Receive_Frame_FSM(struct mstp_port_struct_t *mstp_port)
                 /* indicate that an error has occurred during the reception of a
                  * frame */
                 mstp_port->ReceivedInvalidFrame = true;
-                printf_receive_error("MSTP: Rx Header: ReceiveError\n");
+                log_warn("MSTP: Rx Header: ReceiveError");
                 /* wait for the start of a frame. */
                 mstp_port->receive_state = MSTP_RECEIVE_STATE_IDLE;
             } else if (mstp_port->DataAvailable == true) {
@@ -432,8 +435,8 @@ void MSTP_Receive_Frame_FSM(struct mstp_port_struct_t *mstp_port)
                         /* indicate that an error has occurred during
                            the reception of a frame */
                         mstp_port->ReceivedInvalidFrame = true;
-                        printf_receive_error(
-                            "MSTP: Rx Header: BadCRC [%02X]\n",
+                        log_warn(
+                            "MSTP: Rx Header: BadCRC [%02X]",
                             mstp_port->DataRegister);
                         /* wait for the start of the next frame. */
                         mstp_port->receive_state = MSTP_RECEIVE_STATE_IDLE;
@@ -463,8 +466,8 @@ void MSTP_Receive_Frame_FSM(struct mstp_port_struct_t *mstp_port)
                                         MSTP_RECEIVE_STATE_DATA;
                                 } else {
                                     /* FrameTooLong */
-                                    printf_receive_error(
-                                        "MSTP: Rx Header: FrameTooLong %u\n",
+                                    log_warn(
+                                        "MSTP: Rx Header: FrameTooLong %u",
                                         (unsigned)mstp_port->DataLength);
                                     mstp_port->receive_state =
                                         MSTP_RECEIVE_STATE_SKIP_DATA;
@@ -484,8 +487,8 @@ void MSTP_Receive_Frame_FSM(struct mstp_port_struct_t *mstp_port)
                     /* indicate that an error has occurred during  */
                     /* the reception of a frame */
                     mstp_port->ReceivedInvalidFrame = true;
-                    printf_receive_error(
-                        "MSTP: Rx Data: BadIndex %u\n",
+                    log_warn(
+                        "MSTP: Rx Data: BadIndex %u",
                         (unsigned)mstp_port->Index);
                     /* wait for the start of a frame. */
                     mstp_port->receive_state = MSTP_RECEIVE_STATE_IDLE;
@@ -505,8 +508,8 @@ void MSTP_Receive_Frame_FSM(struct mstp_port_struct_t *mstp_port)
                 /* indicate that an error has occurred during the reception of a
                  * frame */
                 mstp_port->ReceivedInvalidFrame = true;
-                printf_receive_error(
-                    "MSTP: Rx Data: SilenceTimer %ums > %dms\n",
+                log_warn(
+                    "MSTP: Rx Data: SilenceTimer %ums > %dms",
                     (unsigned)mstp_port->SilenceTimer((void *)mstp_port),
                     mstp_port->Tframe_abort);
                 /* wait for the start of the next frame. */
@@ -518,7 +521,7 @@ void MSTP_Receive_Frame_FSM(struct mstp_port_struct_t *mstp_port)
                 /* indicate that an error has occurred during the reception of a
                  * frame */
                 mstp_port->ReceivedInvalidFrame = true;
-                printf_receive_error("MSTP: Rx Data: ReceiveError\n");
+                log_warn("MSTP: Rx Data: ReceiveError");
                 /* wait for the start of the next frame. */
                 mstp_port->receive_state = MSTP_RECEIVE_STATE_IDLE;
             } else if (mstp_port->DataAvailable == true) {
@@ -586,8 +589,8 @@ void MSTP_Receive_Frame_FSM(struct mstp_port_struct_t *mstp_port)
                         } else {
                             /* BadCRC */
                             mstp_port->ReceivedInvalidFrame = true;
-                            printf_receive_error(
-                                "MSTP: Rx Data: BadCRC [%02X]\n",
+                            log_warn(
+                                "MSTP: Rx Data: BadCRC [%02X]",
                                 mstp_port->DataRegister);
                         }
                     }
@@ -689,10 +692,10 @@ bool MSTP_Master_Node_FSM(struct mstp_port_struct_t *mstp_port)
                 /* wait for the next frame - remain in IDLE */
                 mstp_port->ReceivedInvalidFrame = false;
             } else if (mstp_port->ReceivedValidFrame == true) {
-                printf_master(
-                    "MSTP: ReceivedValidFrame "
+                log_trace(
+                    "MSTP: IDLE: ReceivedValidFrame "
                     "Src=%02X Dest=%02X DataLen=%u "
-                    "FC=%u ST=%u Type=%s\n",
+                    "FC=%u ST=%u Type=%s",
                     mstp_port->SourceAddress, mstp_port->DestinationAddress,
                     mstp_port->DataLength, mstp_port->FrameCount,
                     mstp_port->SilenceTimer((void *)mstp_port),
@@ -1217,9 +1220,9 @@ bool MSTP_Master_Node_FSM(struct mstp_port_struct_t *mstp_port)
     }
     if (mstp_port->master_state != master_state) {
         /* change of state detected - so print the details for debugging */
-        printf_master(
+        log_trace(
             "MSTP: TS=%02X[%02X] NS=%02X[%02X] PS=%02X[%02X] EC=%u TC=%u ST=%u "
-            "%s\n",
+            "%s",
             mstp_port->This_Station, next_this_station, mstp_port->Next_Station,
             next_next_station, mstp_port->Poll_Station, next_poll_station,
             mstp_port->EventCount, mstp_port->TokenCount,

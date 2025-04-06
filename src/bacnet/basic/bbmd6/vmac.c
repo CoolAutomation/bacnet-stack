@@ -16,6 +16,9 @@
 /* me! */
 #include "bacnet/basic/bbmd6/vmac.h"
 
+#define LOG_MODULE "basic/service/vmac"
+#include "bacnet/basic/sys/log.h"
+
 /* enable debugging */
 static bool VMAC_Debug = false;
 
@@ -76,8 +79,8 @@ bool VMAC_Add(uint32_t device_id, const struct vmac_data *src)
             if (index >= 0) {
                 status = true;
                 if (VMAC_Debug) {
-                    debug_fprintf(
-                        stderr, "VMAC %u added.\n", (unsigned int)device_id);
+                    log_info(
+                        "VMAC %u added", (unsigned int)device_id);
                 }
             }
         }
@@ -232,6 +235,7 @@ void VMAC_Cleanup(void)
             pVMAC = Keylist_Data_Delete_By_Index(VMAC_List, index);
             if (pVMAC) {
                 if (VMAC_Debug) {
+                    /* TODO: switch to new log system */
                     debug_fprintf(
                         stderr, "VMAC List: %lu [", (unsigned long)device_id);
                     /* print the MAC */
@@ -256,6 +260,6 @@ void VMAC_Init(void)
     VMAC_List = Keylist_Create();
     if (VMAC_List) {
         atexit(VMAC_Cleanup);
-        debug_fprintf(stderr, "VMAC List initialized.\n");
+        log_info("VMAC List initialized");
     }
 }
