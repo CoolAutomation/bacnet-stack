@@ -11,6 +11,9 @@
 #include "bacnet/datalink/arcnet.h"
 #include "bacport.h"
 
+#define LOG_MODULE "ports/linux/arcnet"
+#include "bacnet/basic/sys/log.h"
+
 /** @file linux/arcnet.c  Provides Linux-specific functions for Arcnet. */
 
 /* my local device data - MAC address */
@@ -80,28 +83,26 @@ static int arcnet_bind(const char *interface_name)
     /* check to see if we are being run as root */
     uid = getuid();
     if (uid != 0) {
-        fprintf(
-            stderr,
+        log_err(
             "arcnet: Unable to open an af_packet socket.  "
-            "Try running with root priveleges.\n");
+            "Try running with root priveleges");
         return sock_fd;
     }
-    fprintf(stderr, "arcnet: opening \"%s\"\n", interface_name);
+    log_info("arcnet: opening \"%s\"", interface_name);
     /* note: on some systems you may have to add or enable in */
     /* modules.conf (or in modutils/alias on Debian with update-modules) */
     /* alias net-pf-17 af_packet */
     /* Then follow it by: # modprobe af_packet */
     if ((sock_fd = socket(PF_PACKET, SOCK_PACKET, htons(ETH_P_ALL))) < 0) {
         /* Error occured */
-        fprintf(stderr, "arcnet: Error opening socket: %s\n", strerror(errno));
-        fprintf(
-            stderr,
-            "You might need to add the following to modules.conf\n"
-            "(or in /etc/modutils/alias on Debian with update-modules):\n"
-            "alias net-pf-17 af_packet\n"
-            "Also, add af_packet to /etc/modules.\n"
-            "Then follow it by:\n"
-            "# modprobe af_packet\n");
+        log_perror("arcnet: Error opening socket");
+        log_err(
+            "You might need to add the following to modules.conf "
+            "(or in /etc/modutils/alias on Debian with update-modules): "
+            "alias net-pf-17 af_packet. "
+            "Also, add af_packet to /etc/modules. "
+            "Then follow it by: "
+            "modprobe af_packet");
         exit(-1);
     }
 
@@ -118,23 +119,21 @@ static int arcnet_bind(const char *interface_name)
         strncpy(
             ARCNET_Socket_Address.sa_data, interface_name,
             sizeof(ARCNET_Socket_Address.sa_data) - 1);
-        fprintf(
-            stderr, "arcnet: binding \"%s\"\n", ARCNET_Socket_Address.sa_data);
+        log_info(
+            "arcnet: binding \"%s\"", ARCNET_Socket_Address.sa_data);
         if (bind(
                 sock_fd, &ARCNET_Socket_Address,
                 sizeof(ARCNET_Socket_Address)) != 0) {
             /* Bind problem, close socket and return */
-            fprintf(
-                stderr, "arcnet: Unable to bind socket : %s\n",
-                strerror(errno));
-            fprintf(
-                stderr,
-                "You might need to add the following to modules.conf\n"
-                "(or in /etc/modutils/alias on Debian with update-modules):\n"
-                "alias net-pf-17 af_packet\n"
-                "Also, add af_packet to /etc/modules.\n"
-                "Then follow it by:\n"
-                "# modprobe af_packet\n");
+            log_perror(
+                "arcnet: Unable to bind socket" );
+            log_err(
+                "You might need to add the following to modules.conf "
+                "(or in /etc/modutils/alias on Debian with update-modules): "
+                "alias net-pf-17 af_packet. "
+                "Also, add af_packet to /etc/modules. "
+                "Then follow it by: "
+                "modprobe af_packet");
             /* Close the socket */
             close(sock_fd);
             exit(-1);
@@ -156,8 +155,8 @@ static int arcnet_bind(const char *interface_name)
     strncpy(
         ARCNET_Socket_Address.sa_data, interface_name,
         sizeof(ARCNET_Socket_Address.sa_data) - 1);
-    fprintf(
-        stderr, "arcnet: MAC=%02Xh iface=\"%s\"\n", ARCNET_MAC_Address,
+    log_info(
+        "arcnet: MAC=%02Xh iface=\"%s\"", ARCNET_MAC_Address,
         ARCNET_Socket_Address.sa_data);
 
     atexit(arcnet_cleanup);
@@ -196,20 +195,20 @@ int arcnet_send_pdu(
 
     /* don't waste time if the socket is not valid */
     if (ARCNET_Sock_FD < 0) {
-        fprintf(stderr, "arcnet: socket is invalid!\n");
+        log_err("arcnet: socket is invalid!");
         return -1;
     }
     /* load destination MAC address */
     if (dest->mac_len == 1) {
         pkt->hard.dest = dest->mac[0];
     } else {
-        fprintf(stderr, "arcnet: invalid destination MAC address!\n");
+        log_err("arcnet: invalid destination MAC address!");
         return -2;
     }
     if (src.mac_len == 1) {
         pkt->hard.source = src.mac[0];
     } else {
-        fprintf(stderr, "arcnet: invalid source MAC address!\n");
+        log_err("arcnet: invalid source MAC address!");
         return -3;
     }
     /* Logical PDU portion */
@@ -220,7 +219,7 @@ int arcnet_send_pdu(
     /* packet length */
     mtu_len = ARC_HDR_SIZE + 4 /*SC,DSAP,SSAP,LLC */ + pdu_len;
     if (mtu_len > 512) {
-        fprintf(stderr, "arcnet: PDU is too big to send!\n");
+        log_err("arcnet: PDU is too big (%u>512) to send!", mtu_len);
         return -4;
     }
     memcpy(&pkt->soft.raw[4], pdu, pdu_len);
@@ -231,7 +230,7 @@ int arcnet_send_pdu(
         sizeof(ARCNET_Socket_Address));
     /* did it get sent? */
     if (bytes < 0) {
-        fprintf(stderr, "arcnet: Error sending packet: %s\n", strerror(errno));
+        log_perror("arcnet: Error sending packet");
     }
 
     return bytes;
@@ -285,9 +284,8 @@ uint16_t arcnet_receive(
         /* using O_NONBLOCK and no data */
         /* was immediately available for reading. */
         if (errno != EAGAIN) {
-            fprintf(
-                stderr, "ethernet: Read error in receiving packet: %s\n",
-                strerror(errno));
+            log_perror(
+                "ethernet: Read error in receiving packet" );
         }
         return 0;
     }
@@ -296,35 +294,29 @@ uint16_t arcnet_receive(
         return 0;
     }
 
-    /* printf("arcnet: received %u bytes (offset=%02Xh %02Xh) "
-       "from %02Xh (proto==%02Xh)\n",
+    /* log_trace("arcnet: received %u bytes (offset=%02Xh %02Xh) "
+       "from %02Xh (proto==%02Xh)",
        received_bytes, pkt->offset[0], pkt->offset[1],
        pkt->hard.source, pkt->soft.raw[0]);
      */
 
     if (pkt->hard.source == ARCNET_MAC_Address) {
-        fprintf(stderr, "arcnet: self sent packet?\n");
+        log_warn("arcnet: self sent packet?");
         return 0;
     }
     if (pkt->soft.raw[0] != 0xCD) {
-        /* fprintf(stderr,"arcnet: Non-BACnet packet.\n"); */
+        /* log_warn("arcnet: Non-BACnet packet"); */
         return 0;
     }
     if ((pkt->hard.dest != ARCNET_MAC_Address) &&
         (pkt->hard.dest != ARCNET_BROADCAST)) {
-        fprintf(stderr, "arcnet: This packet is not for us.\n");
+        log_warn("arcnet: This packet is not for us");
         return 0;
     }
     if ((pkt->soft.raw[1] != 0x82) || /* DSAP */
         (pkt->soft.raw[2] != 0x82) || /* LSAP */
         (pkt->soft.raw[3] != 0x03)) { /* LLC Control */
-        fprintf(stderr, "arcnet: BACnet packet has invalid LLC.\n");
-        return 0;
-    }
-    /* It must be addressed to us or be a Broadcast */
-    if ((pkt->hard.dest != ARCNET_MAC_Address) &&
-        (pkt->hard.dest != ARCNET_BROADCAST)) {
-        fprintf(stderr, "arcnet: This packet is not for us.\n");
+        log_err("arcnet: BACnet packet has invalid LLC");
         return 0;
     }
     /* copy the source address */

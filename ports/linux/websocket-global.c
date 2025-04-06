@@ -14,6 +14,9 @@
 #include "websocket-global.h"
 #include "bacnet/basic/sys/debug.h"
 
+#define LOG_MODULE "ports/linux/websocket-global"
+#include "bacnet/basic/sys/log.h"
+
 #if LWS_MAX_SMP <= 1
 #warning \
     "Libwebsockets must be built with LWS_MAX_SMP > 1 (otherwise it does not support thread synchronization in correct way)"
@@ -51,58 +54,50 @@ static volatile int websocket_dispatch_mutex_cnt = 0;
 
 void bsc_websocket_global_lock_dbg(char *f, int line)
 {
-    printf(
-        "bsc_websocket_global_lock_dbg() >>> %s:%d lock_cnt %d tid = %ld\n", f,
+    log_debug(
+        "bsc_websocket_global_lock_dbg() >>> %s:%d lock_cnt %d tid = %ld", f,
         line, websocket_mutex_cnt, pthread_self());
     websocket_mutex_cnt++;
-    fflush(stdout);
     pthread_mutex_lock(&websocket_mutex);
-    printf(
-        "bsc_websocket_global_lock_dbg() <<< lock_cnt %d tid = %ld\n",
+    log_debug(
+        "bsc_websocket_global_lock_dbg() <<< lock_cnt %d tid = %ld",
         websocket_mutex_cnt, pthread_self());
-    fflush(stdout);
 }
 
 void bsc_websocket_global_unlock_dbg(char *f, int line)
 {
-    printf(
-        "bsc_websocket_global_unlock_dbg() >>> %s:%d lock_cnt %d tid = %ld\n",
+    log_debug(
+        "bsc_websocket_global_unlock_dbg() >>> %s:%d lock_cnt %d tid = %ld",
         f, line, websocket_mutex_cnt, pthread_self());
     websocket_mutex_cnt--;
-    fflush(stdout);
     pthread_mutex_unlock(&websocket_mutex);
-    printf(
-        "bsc_websocket_global_unlock_dbg() <<< lock_cnt %d tid = %ld\n",
+    log_debug(
+        "bsc_websocket_global_unlock_dbg() <<< lock_cnt %d tid = %ld",
         websocket_mutex_cnt, pthread_self());
-    fflush(stdout);
 }
 
 void bws_dispatch_lock_dbg(char *f, int line)
 {
-    printf(
-        "bws_dispatch_lock_dbg() >>> %s:%d lock_cnt %d tid = %ld\n", f, line,
+    log_debug(
+        "bws_dispatch_lock_dbg() >>> %s:%d lock_cnt %d tid = %ld", f, line,
         websocket_dispatch_mutex_cnt, pthread_self());
     websocket_dispatch_mutex_cnt++;
-    fflush(stdout);
     pthread_mutex_lock(&websocket_dispatch_mutex);
-    printf(
-        "bws_dispatch_lock_dbg() <<< lock_cnt %d tid = %ld\n",
+    log_debug(
+        "bws_dispatch_lock_dbg() <<< lock_cnt %d tid = %ld",
         websocket_dispatch_mutex_cnt, pthread_self());
-    fflush(stdout);
 }
 
 void bws_dispatch_unlock_dbg(char *f, int line)
 {
-    printf(
-        "bws_dispatch_unlock_dbg() >>> %s:%d lock_cnt %d  tid = %ld\n", f, line,
+    log_debug(
+        "bws_dispatch_unlock_dbg() >>> %s:%d lock_cnt %d  tid = %ld", f, line,
         websocket_dispatch_mutex_cnt, pthread_self());
     websocket_dispatch_mutex_cnt--;
-    fflush(stdout);
     pthread_mutex_unlock(&websocket_dispatch_mutex);
-    printf(
-        "bws_dispatch_unlock_dbg() <<< lock_cnt %d tid = %ld\n",
+    log_debug(
+        "bws_dispatch_unlock_dbg() <<< lock_cnt %d tid = %ld",
         websocket_dispatch_mutex_cnt, pthread_self());
-    fflush(stdout);
 }
 
 #endif
@@ -115,7 +110,7 @@ void bsc_websocket_init_log(void)
     if (!bsc_websocket_log_initialized) {
         bsc_websocket_log_initialized = true;
 #if DEBUG_LIBWEBSOCKETS_ENABLED == 1
-        printf("LWS_MAX_SMP = %d", LWS_MAX_SMP);
+        log_debug("LWS_MAX_SMP = %d", LWS_MAX_SMP);
         lws_set_log_level(
             LLL_ERR | LLL_WARN | LLL_NOTICE | LLL_INFO | LLL_DEBUG |
                 LLL_PARSER | LLL_HEADER | LLL_EXT | LLL_CLIENT | LLL_LATENCY |

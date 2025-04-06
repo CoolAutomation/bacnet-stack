@@ -18,6 +18,9 @@
 #include "bacport.h"
 #include "bacnet/datetime.h"
 
+#define LOG_MODULE "ports/linux/datetime-init"
+#include "bacnet/basic/sys/log.h"
+
 static int32_t Time_Offset; /* Time offset in ms */
 
 /**
@@ -60,9 +63,7 @@ void datetime_timesync(BACNET_DATE *bdate, BACNET_TIME *btime, bool utc)
         } else {
             Time_Offset = time_difference(tv_inp, tv_sys);
         }
-#if PRINT_ENABLED
-        printf("Time offset = %d\n", Time_Offset);
-#endif
+        log_debug("Time offset = %d", Time_Offset);
     }
     return;
 }
