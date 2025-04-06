@@ -44,6 +44,9 @@
 
 #include "dlmstp_port.h"
 
+#define LOG_MODULE "ports/linux/rs485"
+#include "bacnet/basic/sys/log.h"
+
 /* Posix serial programming reference:
 http://www.easysw.com/~mike/serial/serial.html */
 
@@ -383,7 +386,7 @@ void RS485_Send_Frame(
         written = write(RS485_Handle, buffer, nbytes);
         greska = errno;
         if (written <= 0) {
-            printf("write error: %s\n", strerror(greska));
+            log_err("RS485 write error: %s", strerror(greska));
         } else {
             /* wait until all output has been transmitted. */
             tcdrain(RS485_Handle);
@@ -409,7 +412,7 @@ void RS485_Send_Frame(
         written = write(poSharedData->RS485_Handle, buffer, nbytes);
         greska = errno;
         if (written <= 0) {
-            printf("write error: %s\n", strerror(greska));
+            log_err("RS485 write error: %s\n", strerror(greska));
         } else {
             /* wait until all output has been transmitted. */
             tcdrain(poSharedData->RS485_Handle);
@@ -519,9 +522,8 @@ void RS485_Initialize(void)
     struct serial_struct newserial;
     float baud_error = 0.0;
 
-#if PRINT_ENABLED
-    fprintf(stdout, "RS485 Interface: %s\n", RS485_Port_Name);
-#endif
+    log_info("RS485 Initialize Interface: %s", RS485_Port_Name);
+
     /*
        Open device for reading and writing.
        Blocking mode - more CPU effecient
@@ -575,18 +577,15 @@ void RS485_Initialize(void)
                 76800);
         if ((newserial.custom_divisor == 0) || (baud_error > 0.02)) {
             /* bad divisor */
-            fprintf(
-                stderr, "RS485 bad custom divisor %d, base baud %d\n",
+            log_err(
+                "RS485 bad custom divisor %d, base baud %d",
                 newserial.custom_divisor, newserial.baud_base);
             exit(EXIT_FAILURE);
         }
         /* if all goes well, set new divisor */
         ioctl(RS485_Handle, TIOCSSERIAL, &newserial);
     }
-#if PRINT_ENABLED
-    fprintf(stdout, "RS485 Baud Rate %u\n", RS485_Get_Baud_Rate());
-    fflush(stdout);
-#endif
+    log_info("RS485 Baud Rate %u\n", RS485_Get_Baud_Rate());
     /* destructor */
     atexit(RS485_Cleanup);
     /* flush any data waiting */

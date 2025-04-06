@@ -27,6 +27,9 @@
 /* port specific */
 #include "rs485.h"
 
+#define LOG_MODULE "ports/linux/dlmstp"
+#include "bacnet/basic/sys/log.h"
+
 /* Number of MS/TP Packets Rx/Tx */
 uint16_t MSTP_Packets = 0;
 
@@ -152,8 +155,8 @@ static void get_abstime(struct timespec *abstime, unsigned long milliseconds)
 {
     clock_gettime(CLOCK_MONOTONIC, abstime);
     if (milliseconds > 1000) {
-        fprintf(
-            stderr, "DLMSTP: limited timeout of %lums to 1000ms\n",
+        log_err(
+            "DLMSTP: limited timeout of %lums to 1000ms",
             milliseconds);
         milliseconds = 1000;
     }
@@ -337,7 +340,7 @@ uint16_t MSTP_Put_Receive(struct mstp_port_struct_t *mstp_port)
 
     pthread_mutex_lock(&Receive_Packet_Mutex);
     if (Receive_Packet.ready) {
-        debug_printf("MS/TP: Dropped! Not Ready.\n");
+        log_err("MS/TP: Dropped! Not Ready.");
     } else {
         /* bounds check - maybe this should send an abort? */
         pdu_len = mstp_port->DataLength;
@@ -345,7 +348,7 @@ uint16_t MSTP_Put_Receive(struct mstp_port_struct_t *mstp_port)
             pdu_len = sizeof(Receive_Packet.pdu);
         }
         if (pdu_len == 0) {
-            debug_printf("MS/TP: PDU Length is 0!\n");
+            log_err("MS/TP: PDU Length is 0!");
         }
         memmove(
             (void *)&Receive_Packet.pdu[0], (void *)&mstp_port->InputBuffer[0],
@@ -439,14 +442,14 @@ static bool dlmstp_compare_data_expecting_reply(
         request_pdu, request_pdu_len, NULL, &request.address,
         &request.npdu_data);
     if (request.npdu_data.network_layer_message) {
-        debug_printf("DLMSTP: DER Compare failed: "
-                     "Request is Network message.\n");
+        log_warn("DLMSTP: DER Compare failed: "
+                 "Request is Network message");
         return false;
     }
     request.pdu_type = request_pdu[offset] & 0xF0;
     if (request.pdu_type != PDU_TYPE_CONFIRMED_SERVICE_REQUEST) {
-        debug_printf("DLMSTP: DER Compare failed: "
-                     "Not Confirmed Request.\n");
+        log_warn("DLMSTP: DER Compare failed: "
+                 "Not Confirmed Request");
         return false;
     }
     request.invoke_id = request_pdu[offset + 2];
@@ -462,8 +465,8 @@ static bool dlmstp_compare_data_expecting_reply(
     offset = bacnet_npdu_decode(
         reply_pdu, reply_pdu_len, &reply.address, NULL, &reply.npdu_data);
     if (reply.npdu_data.network_layer_message) {
-        debug_printf("DLMSTP: DER Compare failed: "
-                     "Reply is Network message.\n");
+        log_warn("DLMSTP: DER Compare failed: "
+                 "Reply is Network message");
         return false;
     }
     /* reply could be a lot of things:
@@ -498,40 +501,40 @@ static bool dlmstp_compare_data_expecting_reply(
     if ((reply.pdu_type == PDU_TYPE_REJECT) ||
         (reply.pdu_type == PDU_TYPE_ABORT)) {
         if (request.invoke_id != reply.invoke_id) {
-            debug_printf("DLMSTP: DER Compare failed: "
-                         "Invoke ID mismatch.\n");
+            log_warn("DLMSTP: DER Compare failed: "
+                     "Invoke ID mismatch");
             return false;
         }
     } else {
         if (request.invoke_id != reply.invoke_id) {
-            debug_printf("DLMSTP: DER Compare failed: "
-                         "Invoke ID mismatch.\n");
+            log_warn("DLMSTP: DER Compare failed: "
+                     "Invoke ID mismatch");
             return false;
         }
         if (request.service_choice != reply.service_choice) {
-            debug_printf("DLMSTP: DER Compare failed: "
-                         "Service choice mismatch.\n");
+            log_warn("DLMSTP: DER Compare failed: "
+                     "Service choice mismatch");
             return false;
         }
     }
     if (request.npdu_data.protocol_version !=
         reply.npdu_data.protocol_version) {
-        debug_printf("DLMSTP: DER Compare failed: "
-                     "NPDU Protocol Version mismatch.\n");
+        log_warn("DLMSTP: DER Compare failed: "
+                 "NPDU Protocol Version mismatch");
         return false;
     }
 #if 0
     /* the NDPU priority doesn't get passed through the stack, and
        all outgoing messages have NORMAL priority */
     if (request.npdu_data.priority != reply.npdu_data.priority) {
-        debug_printf(
-            "DLMSTP: DER Compare failed: " "NPDU Priority mismatch.\n");
+        log_warn(
+            "DLMSTP: DER Compare failed: " "NPDU Priority mismatch");
         return false;
     }
 #endif
     if (!bacnet_address_same(&request.address, &reply.address)) {
-        debug_printf("DLMSTP: DER Compare failed: "
-                     "BACnet Address mismatch.\n");
+        log_warn("DLMSTP: DER Compare failed: "
+                 "BACnet Address mismatch");
         return false;
     }
 
@@ -684,8 +687,8 @@ bool dlmstp_init(char *ifname)
 
     pthread_condattr_init(&attr);
     if ((rv = pthread_condattr_setclock(&attr, CLOCK_MONOTONIC)) != 0) {
-        fprintf(
-            stderr, "MS/TP Interface: %s\n failed to set MONOTONIC clock\n",
+        log_err(
+            "[MS/TP Interface: %s] failed to set MONOTONIC clock",
             ifname);
         exit(1);
     }
@@ -702,23 +705,22 @@ bool dlmstp_init(char *ifname)
     Receive_Packet.pdu_len = 0;
     rv = pthread_cond_init(&Receive_Packet_Flag, &attr);
     if (rv != 0) {
-        fprintf(
-            stderr,
-            "MS/TP Interface: %s\n cannot allocate PThread Condition.\n",
+        log_err(
+            "[MS/TP Interface: %s] cannot allocate PThread Condition.",
             ifname);
         exit(1);
     }
     rv = pthread_mutex_init(&Receive_Packet_Mutex, NULL);
     if (rv != 0) {
-        fprintf(
-            stderr, "MS/TP Interface: %s\n cannot allocate PThread Mutex.\n",
+        log_err(
+            "[MS/TP Interface: %s] cannot allocate PThread Mutex.",
             ifname);
         exit(1);
     }
     /* initialize hardware */
     if (ifname) {
         RS485_Set_Interface(ifname);
-        debug_fprintf(stderr, "MS/TP Interface: %s\n", ifname);
+        log_info("MS/TP Interface: %s", ifname);
     }
     RS485_Initialize();
     MSTP_Port.InputBuffer = &RxBuffer[0];
@@ -729,16 +731,14 @@ bool dlmstp_init(char *ifname)
     MSTP_Port.SilenceTimer = Timer_Silence;
     MSTP_Port.SilenceTimerReset = Timer_Silence_Reset;
     MSTP_Init(&MSTP_Port);
-    debug_fprintf(stderr, "MS/TP MAC: %02X\n", MSTP_Port.This_Station);
-    debug_fprintf(stderr, "MS/TP Max_Master: %02X\n", MSTP_Port.Nmax_master);
-    debug_fprintf(
-        stderr, "MS/TP Max_Info_Frames: %u\n", MSTP_Port.Nmax_info_frames);
-    fflush(stderr);
+    log_info("MS/TP MAC: %02X", MSTP_Port.This_Station);
+    log_info("MS/TP Max_Master: %02X", MSTP_Port.Nmax_master);
+    log_info("MS/TP Max_Info_Frames: %u", MSTP_Port.Nmax_info_frames);
     /* start one thread */
     run_thread = true;
     rv = pthread_create(&hThread, NULL, dlmstp_master_fsm_task, NULL);
     if (rv != 0) {
-        fprintf(stderr, "Failed to start Master Node FSM task\n");
+        log_fatal("Failed to start Master Node FSM task (ret=%d)", rv);
     }
 
     return true;

@@ -14,10 +14,13 @@
 #include "bacnet/basic/sys/debug.h"
 #include "bacnet/datalink/bsc/bsc-event.h"
 
+#define LOG_MODULE "ports/linux/bsc-event"
+#include "bacnet/basic/sys/log.h"
+
 #define DEBUG_BSC_EVENT 0
 
 #if DEBUG_BSC_EVENT == 1
-#define DEBUG_PRINTF printf
+#define DEBUG_PRINTF log_debug
 #else
 #undef DEBUG_ENABLED
 #define DEBUG_PRINTF debug_printf_disabled

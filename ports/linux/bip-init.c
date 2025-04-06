@@ -31,6 +31,9 @@
 #include "bacnet/basic/bbmd/h_bbmd.h"
 #include "bacport.h"
 
+#define LOG_MODULE "ports/linux/bip-init"
+#include "bacnet/basic/sys/log.h"
+
 /* unix sockets */
 static int BIP_Socket = -1;
 static int BIP_Broadcast_Socket = -1;
@@ -65,10 +68,9 @@ static void debug_print_ipv4(
     const unsigned int count)
 {
     if (BIP_Debug) {
-        fprintf(
-            stderr, "BIP: %s %s:%hu (%u bytes)\n", str, inet_ntoa(*addr),
+        log_debug(
+            "BIP: %s %s:%hu (%u bytes)", str, inet_ntoa(*addr),
             ntohs(port), count);
-        fflush(stderr);
     }
 }
 
@@ -281,8 +283,7 @@ int bip_send_mpdu(
     /* assumes that the driver has already been initialized */
     if (BIP_Socket < 0) {
         if (BIP_Debug) {
-            fprintf(stderr, "BIP: driver not initialized!\n");
-            fflush(stderr);
+            log_debug("BIP: driver not initialized!");
         }
         return BIP_Socket;
     }
@@ -403,8 +404,9 @@ uint16_t bip_receive(
             }
         } else {
             if (BIP_Debug) {
-                fprintf(stderr, "BIP: NPDU dropped!\n");
-                fflush(stderr);
+                log_warn(
+                    "BIP: NPDU dropped due to its size (size %u, max %u)!",
+                    npdu_len, max_npdu);
             }
             npdu_len = 0;
         }
@@ -538,7 +540,7 @@ readNlSock(int sockFd, char *bufPtr, size_t buf_size, int seqNum, int pId)
     do {
         /* Receive response from the kernel */
         if ((readLen = recv(sockFd, bufPtr, buf_size - msgLen, 0)) < 0) {
-            perror("SOCK READ: ");
+            log_perror("SOCK READ: ");
             return -1;
         }
         if (readLen == 0) {
@@ -549,7 +551,7 @@ readNlSock(int sockFd, char *bufPtr, size_t buf_size, int seqNum, int pId)
         /* Check if the header is valid */
         if ((0 == NLMSG_OK(nlHdr, readLen)) ||
             (NLMSG_ERROR == nlHdr->nlmsg_type)) {
-            perror("Error in received packet");
+            log_perror("Error in received packet");
             return -1;
         }
         /* Check if it is the last message */
@@ -592,22 +594,15 @@ static char *ntoa(uint32_t addr)
 static void printRoute(struct route_info *rtInfo)
 {
     if (BIP_Debug) {
-        /* Print Destination address */
-        fprintf(
-            stderr, "%s\t",
-            rtInfo->dstAddr ? ntoa(rtInfo->dstAddr) : "0.0.0.0  ");
-
-        /* Print Gateway address */
-        fprintf(
-            stderr, "%s\t",
-            rtInfo->gateWay ? ntoa(rtInfo->gateWay) : "*.*.*.*");
-
-        /* Print Interface Name */
-        fprintf(stderr, "%s\t", rtInfo->ifName);
-
-        /* Print Source address */
-        fprintf(
-            stderr, "%s\n",
+        /* Print: Destination address */
+        /*        Gateway address */
+        /*        Interface Name */
+        /*        Source address */
+        log_debug(
+            "%s\t%s\t%s\t%s",
+            rtInfo->dstAddr ? ntoa(rtInfo->dstAddr) : "0.0.0.0  ",
+            rtInfo->gateWay ? ntoa(rtInfo->gateWay) : "*.*.*.*",
+            rtInfo->ifName,
             rtInfo->srcAddr ? ntoa(rtInfo->srcAddr) : "*.*.*.*");
     }
 }
@@ -670,7 +665,7 @@ static char *ifname_default(void)
     }
     /* Create Socket */
     if ((sock = socket(PF_NETLINK, SOCK_DGRAM, NETLINK_ROUTE)) < 0) {
-        perror("Socket Creation: ");
+        log_perror("Socket Creation: ");
     }
     /* point the header and the msg structure pointers into the buffer */
     nlMsg = (struct nlmsghdr *)msgBuf;
@@ -687,19 +682,19 @@ static char *ifname_default(void)
 
     /* Send the request */
     if (send(sock, nlMsg, nlMsg->nlmsg_len, 0) < 0) {
-        fprintf(stderr, "BIP: Write To Socket Failed...\n");
+        log_err("BIP: Write To Socket Failed...");
         return BIP_Interface_Name;
     }
     /* Read the response */
     if ((len = readNlSock(sock, msgBuf, sizeof(msgBuf), msgSeq, getpid())) <
         0) {
-        fprintf(stderr, "BIP: Read From Socket Failed...\n");
+        log_err("BIP: Read From Socket Failed...");
         return BIP_Interface_Name;
     }
     /* Parse and print the response */
     rtInfo = (struct route_info *)malloc(sizeof(struct route_info));
     if (BIP_Debug) {
-        fprintf(stderr, "Destination\tGateway\tInterface\tSource\n");
+        log_debug("Destination\tGateway\tInterface\tSource");
     }
     for (; NLMSG_OK(nlMsg, len); nlMsg = NLMSG_NEXT(nlMsg, len)) {
         memset(rtInfo, 0, sizeof(struct route_info));
@@ -770,9 +765,8 @@ void bip_set_interface(const char *ifname)
     }
     BIP_Address.s_addr = local_address.s_addr;
     if (BIP_Debug) {
-        fprintf(stderr, "BIP: Interface: %s\n", ifname);
-        fprintf(stderr, "BIP: Address: %s\n", inet_ntoa(local_address));
-        fflush(stderr);
+        log_debug("BIP: Interface: %s", ifname);
+        log_debug("BIP: Address: %s", inet_ntoa(local_address));
     }
     /* setup local broadcast address */
 #ifdef BACNET_IP_BROADCAST_USE_CLASSADDR
@@ -807,13 +801,12 @@ void bip_set_interface(const char *ifname)
     }
 #endif
     if (BIP_Debug) {
-        fprintf(
-            stderr, "BIP: Broadcast Address: %s\n",
+        log_debug(
+            "BIP: Broadcast Address: %s",
             inet_ntoa(BIP_Broadcast_Addr));
-        fprintf(
-            stderr, "BIP: UDP Port: 0x%04X [%hu]\n", ntohs(BIP_Port),
+        log_debug(
+            "BIP: UDP Port: 0x%04X [%hu]", ntohs(BIP_Port),
             ntohs(BIP_Port));
-        fflush(stderr);
     }
 }
 
@@ -850,7 +843,7 @@ static int createSocket(const struct sockaddr_in *sin)
         strlen(BIP_Interface_Name));
     if (status < 0) {
         if (BIP_Debug) {
-            perror("SO_BINDTODEVICE: ");
+            log_perror("SO_BINDTODEVICE: ");
         }
     }
     /* bind the socket to the local port number and IP address */
@@ -893,10 +886,9 @@ bool bip_init(char *ifname)
         bip_set_interface(ifname_default());
     }
     if (BIP_Address.s_addr == 0) {
-        fprintf(
-            stderr, "BIP: Failed to get an IP address from %s!\n",
+        log_err(
+            "BIP: Failed to get an IP address from %s!",
             BIP_Interface_Name);
-        fflush(stderr);
         return false;
     }
 

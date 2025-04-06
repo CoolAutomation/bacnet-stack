@@ -17,8 +17,11 @@
 
 #define DEBUG_WEBSOCKET_CLIENT 0
 
+#define LOG_MODULE "ports/linux/websocket-cli"
+#include "bacnet/basic/sys/log.h"
+
 #if DEBUG_WEBSOCKET_CLIENT == 1
-#define DEBUG_PRINTF debug_printf
+#define DEBUG_PRINTF log_debug
 #else
 #undef DEBUG_ENABLED
 #define DEBUG_PRINTF debug_printf_disabled
