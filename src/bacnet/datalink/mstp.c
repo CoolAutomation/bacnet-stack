@@ -1766,7 +1766,7 @@ void MSTP_Init(struct mstp_port_struct_t *mstp_port)
             mstp_port->Treply_timeout = DEFAULT_Treply_timeout;
         }
         if ((mstp_port->Tusage_timeout < 20) ||
-            (mstp_port->Tusage_timeout > 35)) {
+            (mstp_port->Tusage_timeout > 100)) {
             mstp_port->Tusage_timeout = DEFAULT_Tusage_timeout;
         }
         mstp_port->receive_state = MSTP_RECEIVE_STATE_IDLE;
