@@ -730,6 +730,7 @@ bool dlmstp_init(char *ifname)
     MSTP_Port.InputBufferSize = sizeof(RxBuffer);
     MSTP_Port.OutputBuffer = &TxBuffer[0];
     MSTP_Port.OutputBufferSize = sizeof(TxBuffer);
+    MSTP_Port.Tusage_timeout = Tusage_timeout;
     clock_gettime(CLOCK_MONOTONIC, &start);
     MSTP_Port.SilenceTimer = Timer_Silence;
     MSTP_Port.SilenceTimerReset = Timer_Silence_Reset;
