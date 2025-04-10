@@ -28,6 +28,33 @@
 /* size of the buffer used to send and validate a unique test request */
 #define MSTP_UUID_SIZE 16
 
+/* container for packet and token statistics */
+struct mstp_port_statistics_t {
+    uint32_t transmit_frame_counter;
+    uint32_t receive_valid_frame_counter;
+    uint32_t receive_invalid_frame_counter;
+    uint32_t bad_crc_counter;
+    uint32_t reply_timeout_counter;
+    uint32_t receive_not_for_us_counter;
+    uint32_t receive_timeout_counter;
+    uint32_t receive_token_counter;
+    uint32_t send_token_counter;
+    uint32_t send_pfm_counter;
+    uint32_t receive_pfm_counter;
+    uint32_t receive_rpfm_counter;
+    uint32_t nothing_to_send_counter;
+    uint32_t transmit_pdu_counter;
+    uint32_t frame_too_long_counter;
+    uint32_t receive_unexpected_frame_counter;
+    uint32_t retry_send_token_counter;
+    uint32_t deferred_reply_counter;
+    uint32_t reply_counter;
+    uint32_t find_new_successor_counter;
+    uint32_t receive_pdu_counter;
+    uint32_t lost_token_counter;
+    uint32_t declare_sole_master_counter;
+};
+
 struct mstp_port_struct_t {
     MSTP_RECEIVE_STATE receive_state;
     /* When a master node is powered up or reset, */
@@ -212,6 +239,9 @@ struct mstp_port_struct_t {
        40 bits is 4 octets including a start and stop bit with each octet.
        turnaround_time_milliseconds = (Tturnaround*1000UL)/RS485_Baud; */
     uint8_t Tturnaround_timeout;
+
+    /* Port TX/RX statistics */
+    struct mstp_port_statistics_t Statistics;
 
     /*Platform-specific port data */
     void *UserData;
