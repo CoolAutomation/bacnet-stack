@@ -744,7 +744,7 @@ bool MSTP_Master_Node_FSM(struct mstp_port_struct_t *mstp_port)
                         break;
                     case FRAME_TYPE_POLL_FOR_MASTER:
                         /* ReceivedPFM */
-                        log_trace("MSTP: ReceivedPFM");
+                        log_info("MSTP: ReceivedPFM");
                         mstp_port->Statistics.receive_pfm_counter++;
                         /* DestinationAddress is equal to TS */
                         if (mstp_port->DestinationAddress ==
