@@ -683,6 +683,70 @@ void dlmstp_get_broadcast_address(BACNET_ADDRESS *dest)
     return;
 }
 
+/**
+ * @brief Reset the MS/TP statistics
+ */
+void dlmstp_reset_statistics(void)
+{
+    memset(&MSTP_Port.Statistics, 0, sizeof(struct mstp_port_statistics_t));
+}
+
+/**
+ * @brief Copy the MSTP port statistics if they exist
+ * @param statistics - MSTP port statistics
+ */
+void dlmstp_fill_statistics(struct dlmstp_statistics *statistics)
+{
+    if (statistics) {
+        statistics->transmit_frame_counter =
+            MSTP_Port.Statistics.transmit_frame_counter;
+        statistics->receive_valid_frame_counter =
+            MSTP_Port.Statistics.receive_valid_frame_counter;
+        statistics->receive_invalid_frame_counter =
+            MSTP_Port.Statistics.receive_invalid_frame_counter;
+        statistics->receive_not_for_us_counter =
+            MSTP_Port.Statistics.receive_not_for_us_counter;
+        statistics->transmit_pdu_counter =
+            MSTP_Port.Statistics.transmit_pdu_counter;
+        statistics->receive_pdu_counter =
+            MSTP_Port.Statistics.receive_pdu_counter;
+        statistics->lost_token_counter =
+            MSTP_Port.Statistics.lost_token_counter;
+        statistics->bad_crc_counter =
+            MSTP_Port.Statistics.bad_crc_counter;
+        statistics->reply_timeout_counter =
+            MSTP_Port.Statistics.reply_timeout_counter;
+        statistics->receive_timeout_counter =
+            MSTP_Port.Statistics.receive_timeout_counter;
+        statistics->receive_token_counter =
+            MSTP_Port.Statistics.receive_token_counter;
+        statistics->send_token_counter =
+            MSTP_Port.Statistics.send_token_counter;
+        statistics->send_pfm_counter =
+            MSTP_Port.Statistics.send_pfm_counter;
+        statistics->receive_pfm_counter =
+            MSTP_Port.Statistics.receive_pfm_counter;
+        statistics->receive_rpfm_counter =
+            MSTP_Port.Statistics.receive_rpfm_counter;
+        statistics->nothing_to_send_counter =
+            MSTP_Port.Statistics.nothing_to_send_counter;
+        statistics->frame_too_long_counter =
+            MSTP_Port.Statistics.frame_too_long_counter;
+        statistics->receive_unexpected_frame_counter =
+            MSTP_Port.Statistics.receive_unexpected_frame_counter;
+        statistics->retry_send_token_counter =
+            MSTP_Port.Statistics.retry_send_token_counter;
+        statistics->deferred_reply_counter =
+            MSTP_Port.Statistics.deferred_reply_counter;
+        statistics->reply_counter =
+            MSTP_Port.Statistics.reply_counter;
+        statistics->find_new_successor_counter =
+            MSTP_Port.Statistics.find_new_successor_counter;
+        statistics->declare_sole_master_counter =
+            MSTP_Port.Statistics.declare_sole_master_counter;
+    }
+}
+
 bool dlmstp_init(char *ifname)
 {
     pthread_condattr_t attr;

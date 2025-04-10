@@ -38,9 +38,26 @@ typedef struct dlmstp_statistics {
     uint32_t transmit_frame_counter;
     uint32_t receive_valid_frame_counter;
     uint32_t receive_invalid_frame_counter;
+    uint32_t bad_crc_counter;
+    uint32_t reply_timeout_counter;
+    uint32_t receive_not_for_us_counter;
+    uint32_t receive_timeout_counter;
+    uint32_t receive_token_counter;
+    uint32_t send_token_counter;
+    uint32_t send_pfm_counter;
+    uint32_t receive_pfm_counter;
+    uint32_t receive_rpfm_counter;
+    uint32_t nothing_to_send_counter;
     uint32_t transmit_pdu_counter;
+    uint32_t frame_too_long_counter;
+    uint32_t receive_unexpected_frame_counter;
+    uint32_t retry_send_token_counter;
+    uint32_t deferred_reply_counter;
+    uint32_t reply_counter;
+    uint32_t find_new_successor_counter;
     uint32_t receive_pdu_counter;
     uint32_t lost_token_counter;
+    uint32_t declare_sole_master_counter;
 } DLMSTP_STATISTICS;
 
 #ifndef DLMSTP_MAX_INFO_FRAMES
