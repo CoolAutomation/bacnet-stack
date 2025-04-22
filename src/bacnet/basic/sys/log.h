@@ -18,11 +18,11 @@
 #endif
 
 #ifndef PRINT_WITH_TIMESTAMP
-#define PRINT_WITH_TIMESTAMP 1 /*TODO=0*/
+#define PRINT_WITH_TIMESTAMP 0
 #endif
 
 #ifndef PRINT_WITH_COLORS
-#define PRINT_WITH_COLORS 1 /*TODO=0*/
+#define PRINT_WITH_COLORS 0
 #endif
 
 #ifndef LOG_MODULE
