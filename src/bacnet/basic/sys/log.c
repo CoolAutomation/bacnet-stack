@@ -29,7 +29,7 @@ void blog_set_log_function(blog_logFn func)
 }
 
 /* Makes sense only for default_log_function */
-static int log_level = BACNET_LOG_LEVEL_TRACE;
+static int log_level = BACNET_LOG_LEVEL_INFO;
 void blog_set_level(int level)
 {
     if (log_level < BACNET_LOG_LEVEL_NONE) {
@@ -47,7 +47,7 @@ void default_log_function(const char *module, int level, const char *format, va_
 #if PRINT_ENABLED
     FILE *stream;
 
-#ifdef PRINT_WITH_COLORS
+#if PRINT_WITH_COLORS
     static const char* const level_colors[] = {
         "", "\x1b[35m", "\x1b[31m", "\x1b[33m", "\x1b[32m", "\x1b[36m", "\x1b[94m"
     };
@@ -55,27 +55,27 @@ void default_log_function(const char *module, int level, const char *format, va_
     static const char* const level_strings[] = {
         "", "FATAL", "ERROR", " WARN", " INFO", "DEBUG", "TRACE"
     };
-#ifdef PRINT_WITH_TIMESTAMP
+#if PRINT_WITH_TIMESTAMP
     BACNET_DATE date;
     BACNET_TIME time;
 #endif
 
     stream = stderr;
+    if (level > log_level)
+        return;
 
-#ifdef PRINT_WITH_TIMESTAMP
+#if PRINT_WITH_TIMESTAMP
     datetime_local(&date, &time, NULL, NULL);
     fprintf(stream,
         "%02d:%02d:%02d.%03d ", time.hour,
         time.min, time.sec, time.hundredths * 10);
 #endif /* DEBUG_WITH_TIMESTAMP */
 
-#ifdef PRINT_WITH_COLORS
+#if PRINT_WITH_COLORS
     fprintf(stream, "%s%s\x1b[0m: ", level_colors[level], level_strings[level]);
 #else
     fprintf(stream, "%s: ", level_strings[level]);
 #endif /* DEBUG_WITH_COLORS */
-
-    /* TODO: check log_level */
     fprintf(stream, "%s: ", module);
     vfprintf(stream, format, ap);
     fprintf(stream, "\n");
