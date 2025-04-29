@@ -41,10 +41,6 @@ static DLMSTP_PACKET Receive_Packet;
 /* mechanism to wait for a packet */
 static pthread_cond_t Receive_Packet_Flag;
 static pthread_mutex_t Receive_Packet_Mutex;
-static pthread_cond_t Received_Frame_Flag;
-static pthread_mutex_t Received_Frame_Mutex;
-static pthread_cond_t Master_Done_Flag;
-static pthread_mutex_t Master_Done_Mutex;
 static pthread_mutex_t Ring_Buffer_Mutex;
 static pthread_mutex_t Thread_Mutex;
 static pthread_t hThread;
@@ -172,12 +168,8 @@ void dlmstp_cleanup(void)
     run_thread = false;
     pthread_mutex_unlock(&Thread_Mutex);
     pthread_join(hThread, NULL);
-    pthread_cond_destroy(&Received_Frame_Flag);
-    pthread_cond_destroy(&Receive_Packet_Flag);
-    pthread_cond_destroy(&Master_Done_Flag);
     pthread_mutex_destroy(&Received_Frame_Mutex);
     pthread_mutex_destroy(&Receive_Packet_Mutex);
-    pthread_mutex_destroy(&Master_Done_Mutex);
     pthread_mutex_destroy(&Ring_Buffer_Mutex);
 }
 
