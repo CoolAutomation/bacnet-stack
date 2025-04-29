@@ -699,7 +699,9 @@ if(ZEPHYR_BASE)
 elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
   message(STATUS "BACNET: building for linux")
   set(BACNET_PORT_DIRECTORY_PATH ${CMAKE_CURRENT_LIST_DIR}/ports/linux)
-  target_link_libraries(${PROJECT_NAME} PUBLIC m)
+  find_library(UBUS_LIB NAMES ubus REQUIRED)
+  find_library(UBOX_LIB NAMES ubox REQUIRED)
+  target_link_libraries(${PROJECT_NAME} PUBLIC m ubus ubox)
   add_compile_definitions(BACNET_PORT=linux)
 
   target_sources(${PROJECT_NAME} PRIVATE
@@ -710,7 +712,7 @@ elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     $<$<BOOL:${BACDL_ARCNET}>:ports/linux/arcnet.c>
     $<$<BOOL:${BACDL_MSTP}>:ports/linux/rs485.c>
     $<$<BOOL:${BACDL_MSTP}>:ports/linux/rs485.h>
-    $<$<BOOL:${BACDL_MSTP}>:ports/linux/dlmstp.c>
+    $<$<BOOL:${BACDL_MSTP}>:ports/linux/dlmstp_ubus.c>
     $<$<BOOL:${BACDL_ETHERNET}>:ports/linux/ethernet.c>
     $<$<BOOL:${BACDL_BSC}>:ports/linux/bsc-event.c>
     $<$<BOOL:${BACDL_BSC}>:ports/linux/websocket-cli.c>
