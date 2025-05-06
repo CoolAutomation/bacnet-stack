@@ -22,6 +22,7 @@
 #include "bacnet/npdu.h"
 #include "bacnet/datalink/mstp.h"
 #include "bacnet/datalink/dlmstp.h"
+#include "bacnet/basic/sys/ringbuf.h"
 #include "bacnet/basic/sys/debug.h"
 /* OS Specific include */
 #include "bacport.h"
@@ -29,7 +30,10 @@
 #define LOG_MODULE "ports/linux/dlmstp_ubus"
 #include "bacnet/basic/sys/log.h"
 
-static DLMSTP_PACKET Receive_Packet;
+/* count must be a power of 2 for ringbuf library */
+#define MSTP_RX_QUEUE_SIZE 8
+static DLMSTP_PACKET RX_Buffer[MSTP_RX_QUEUE_SIZE];
+static RING_BUFFER RX_Queue;
 
 static int This_Station;
 static int Nmax_info_frames;
@@ -84,10 +88,11 @@ uint16_t dlmstp_receive(
     BACNET_ADDRESS *src, /* source address */
     uint8_t *pdu, /* PDU data */
     uint16_t max_pdu, /* amount of space available in the PDU  */
-    unsigned timeout)
+    unsigned timeout_ms )
 { /* milliseconds to wait for a packet */
     uint16_t pdu_len = 0;
     struct pollfd fds[1];
+    DLMSTP_PACKET *pkt;
     int ret;
 
     (void)max_pdu;
@@ -97,7 +102,11 @@ uint16_t dlmstp_receive(
     fds[0].fd = ctx->sock.fd;
     fds[0].events = POLLIN;
 
-    ret = poll( fds, ARRAY_SIZE(fds), timeout/*ms*/ );
+    /* No need to wait if RX queue already has pending packet */
+    if( !Ringbuf_Empty(&RX_Queue) )
+        timeout_ms = 0;
+
+    ret = poll( fds, ARRAY_SIZE(fds), timeout_ms );
     if( ret == -1 )
     {
         log_warn( "poll() failed with errno %d (%s)",
@@ -108,30 +117,34 @@ uint16_t dlmstp_receive(
         /* Check if there are any ubus events to handle */
         if( fds[0].revents & POLLIN )
         {
+            /*
+            * If there are ubus events containing a PDU, the RX_Queue
+            * will be filled with them thanks to `dlmstp_ubus_receive`
+            */
             ubus_handle_event( ctx );
+        }
+    }
 
-            /* Have we received any packets? */
-            if( Receive_Packet.ready )
+    /* Have we received any packets? */
+    if( !Ringbuf_Empty(&RX_Queue) )
+    {
+        pkt = (DLMSTP_PACKET *)Ringbuf_Peek( &RX_Queue );
+        if( pkt->pdu_len )
+        {
+            pdu_len = pkt->pdu_len;
+            if( src )
             {
-                if( Receive_Packet.pdu_len )
-                {
-                    if( src )
-                    {
-                        memmove(
-                            src, &Receive_Packet.address,
-                            sizeof(Receive_Packet.address));
-                    }
-                    if( pdu )
-                    {
-                        memmove(
-                            pdu, &Receive_Packet.pdu,
-                            sizeof(Receive_Packet.pdu));
-                    }
-                    pdu_len = Receive_Packet.pdu_len;
-                }
-                Receive_Packet.ready = false;
+                memmove( src, &pkt->address, sizeof(pkt->address) );
+            }
+            if( pdu )
+            {
+                memmove( pdu, &pkt->pdu,
+                         pdu_len <= max_pdu ? pdu_len : max_pdu );
             }
         }
+        (void)Ringbuf_Pop( &RX_Queue, NULL );
+        log_debug( "MS/TP: Packet received from RX queue (%d/%d)",
+                   Ringbuf_Count(&RX_Queue), MSTP_RX_QUEUE_SIZE );
     }
 
     return pdu_len;
@@ -263,6 +276,7 @@ static void dlmstp_ubus_receive( struct ubus_context *ctx,
     unsigned char *pdu_data;
     uint8_t *payload;
     uint8_t src;
+    DLMSTP_PACKET *pkt;
     static const struct blobmsg_policy policy =
         { "payload", BLOBMSG_TYPE_UNSPEC };
 
@@ -273,37 +287,39 @@ static void dlmstp_ubus_receive( struct ubus_context *ctx,
     blobmsg_parse( &policy, 1, tb, blob_data(msg), blob_len(msg) );
     if( !tb[0] )
     {
-        log_warn("Failed to parse ubus event %s", type );
+        log_warn( "Failed to parse ubus event %s", type );
         return;
     }
 
-    if (Receive_Packet.ready) {
-        log_err("MS/TP: RX packet queue is full");
-    } else {
-        /* bounds check - maybe this should send an abort? */
-
-        /* payload contains [SRC] [PDU] */
-        payload = blobmsg_data(tb[0]);
-
-        pdu_len = blobmsg_data_len(tb[0]) - 1;
-        pdu_data = &payload[1];
-        if (pdu_len > sizeof(Receive_Packet.pdu)) {
-            pdu_len = sizeof(Receive_Packet.pdu);
-        }
-        if (pdu_len == 0) {
-            log_warn("MS/TP: PDU Length is 0!");
-        }
-
-        src = payload[0];
-        memmove(
-            (void *)&Receive_Packet.pdu[0], (void *)&pdu_data[0],
-            pdu_len);
-        dlmstp_fill_bacnet_address(
-            &Receive_Packet.address, src);
-
-        Receive_Packet.pdu_len = pdu_len;
-        Receive_Packet.ready = true;
+    pkt = (DLMSTP_PACKET *)Ringbuf_Data_Peek( &RX_Queue );
+    if( pkt == NULL )
+    {
+        log_err( "MS/TP: RX packet queue is full" );
+        return;
     }
+
+    /* payload contains [SRC] [PDU] */
+    payload = blobmsg_data(tb[0]);
+
+    pdu_len = blobmsg_data_len(tb[0]) - 1;
+    pdu_data = &payload[1];
+    if( pdu_len > sizeof(RX_Buffer[0].pdu) )
+    {
+        pdu_len = sizeof(RX_Buffer[0].pdu);
+    }
+    if( pdu_len == 0 )
+    {
+        log_warn( "MS/TP: PDU Length is 0!" );
+    }
+
+    src = payload[0];
+    memmove( (void *)&pkt->pdu[0], (void *)&pdu_data[0], pdu_len );
+    dlmstp_fill_bacnet_address( &pkt->address, src );
+
+    pkt->pdu_len = pdu_len;
+    Ringbuf_Data_Put( &RX_Queue, (uint8_t *)pkt );
+    log_debug( "MS/TP: Packet sent to RX queue (%d/%d)",
+               Ringbuf_Count(&RX_Queue), MSTP_RX_QUEUE_SIZE );
 }
 
 void dlmstp_set_baud_rate(uint32_t _baud)
@@ -338,8 +354,9 @@ bool dlmstp_init( char *_ifname )
     ubus_register_event_handler( ctx, &listener, eventname );
     log_info( "MSTP: Subscribe to ubus event %s", eventname );
 
-    /* Initialize RX packet "queue" for only one message */
-    Receive_Packet.ready = false;
-    Receive_Packet.pdu_len = 0;
+    /* Initialize RX packet queue */
+    Ringbuf_Init(
+        &RX_Queue, (uint8_t *)&RX_Buffer, sizeof(DLMSTP_PACKET),
+        MSTP_RX_QUEUE_SIZE );
     return true;
 }
