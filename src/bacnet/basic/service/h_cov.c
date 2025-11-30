@@ -624,11 +624,12 @@ bool handler_cov_fsm(void)
         COV_STATE_SEND
     } cov_task_state = COV_STATE_IDLE;
 
+_fsm:
     switch (cov_task_state) {
         case COV_STATE_IDLE:
             index = 0;
             cov_task_state = COV_STATE_MARK;
-            break;
+            goto _fsm;
         case COV_STATE_MARK:
             /* mark any subscriptions where the value has changed */
             if (COV_Subscriptions[index].flag.valid) {
@@ -648,8 +649,9 @@ bool handler_cov_fsm(void)
             if (index >= MAX_COV_SUBCRIPTIONS) {
                 index = 0;
                 cov_task_state = COV_STATE_CLEAR;
+                break;
             }
-            break;
+            goto _fsm;
         case COV_STATE_CLEAR:
             /* clear the COV flag after checking all subscriptions */
             if ((COV_Subscriptions[index].flag.valid) &&
@@ -664,8 +666,9 @@ bool handler_cov_fsm(void)
             if (index >= MAX_COV_SUBCRIPTIONS) {
                 index = 0;
                 cov_task_state = COV_STATE_FREE;
+                break;
             }
-            break;
+            goto _fsm;
         case COV_STATE_FREE:
             /* confirmed notification house keeping */
             if ((COV_Subscriptions[index].flag.valid) &&
@@ -683,8 +686,9 @@ bool handler_cov_fsm(void)
             if (index >= MAX_COV_SUBCRIPTIONS) {
                 index = 0;
                 cov_task_state = COV_STATE_SEND;
+                break;
             }
-            break;
+            goto _fsm;
         case COV_STATE_SEND:
             /* send any COVs that are requested */
             if ((COV_Subscriptions[index].flag.valid) &&
