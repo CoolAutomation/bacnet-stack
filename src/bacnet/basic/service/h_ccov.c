@@ -14,6 +14,7 @@
 #include "bacnet/bacdef.h"
 /* BACnet Stack API */
 #include "bacnet/bacdcode.h"
+#include "bacnet/bacerror.h"
 #include "bacnet/apdu.h"
 #include "bacnet/npdu.h"
 #include "bacnet/abort.h"
@@ -34,6 +35,7 @@
 
 /* COV notification callbacks list */
 static BACNET_COV_NOTIFICATION Confirmed_COV_Notification_Head;
+static BACNET_CCOV_CHECK_SUBSCRIPTION Is_Subscription_Valid_Func = NULL;
 
 /**
  * @brief call the COV notification callbacks
@@ -72,6 +74,11 @@ void handler_ccov_notification_add(BACNET_COV_NOTIFICATION *cb)
         }
         head = head->next;
     } while (head);
+}
+
+void handler_ccov_check_subscription_set(BACNET_CCOV_CHECK_SUBSCRIPTION callback)
+{
+    Is_Subscription_Valid_Func = callback;
 }
 
 /*  */
@@ -158,10 +165,20 @@ void handler_ccov_notification(
         PRINTF("CCOV: Bad Encoding. Sending Abort!\n");
         goto CCOV_ABORT;
     } else {
-        len = encode_simple_ack(
-            &Handler_Transmit_Buffer[pdu_len], service_data->invoke_id,
-            SERVICE_CONFIRMED_COV_NOTIFICATION);
-        PRINTF("CCOV: Sending Simple Ack!\n");
+        if (Is_Subscription_Valid_Func && !Is_Subscription_Valid_Func(&cov_data))
+        {
+            len = bacerror_encode_apdu(
+                &Handler_Transmit_Buffer[pdu_len], service_data->invoke_id,
+                SERVICE_CONFIRMED_COV_NOTIFICATION,
+                ERROR_CLASS_SERVICES, ERROR_CODE_UNKNOWN_SUBSCRIPTION);
+        }
+        else
+        {
+            len = encode_simple_ack(
+                &Handler_Transmit_Buffer[pdu_len], service_data->invoke_id,
+                SERVICE_CONFIRMED_COV_NOTIFICATION);
+            PRINTF("CCOV: Sending Simple Ack!\n");
+        }
     }
 CCOV_ABORT:
     pdu_len += len;

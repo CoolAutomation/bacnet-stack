@@ -20,8 +20,15 @@
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
+
+BACNET_STACK_EXPORT
+typedef bool (*BACNET_CCOV_CHECK_SUBSCRIPTION)(BACNET_COV_DATA *cov_data);
+
 BACNET_STACK_EXPORT
 void handler_ccov_notification_add(BACNET_COV_NOTIFICATION *callback);
+
+BACNET_STACK_EXPORT
+void handler_ccov_check_subscription_set(BACNET_CCOV_CHECK_SUBSCRIPTION callback);
 
 BACNET_STACK_EXPORT
 void handler_ccov_notification(
