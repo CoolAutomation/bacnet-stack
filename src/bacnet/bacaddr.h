@@ -62,6 +62,10 @@ BACNET_STACK_EXPORT
 int decode_context_bacnet_address(
     const uint8_t *apdu, uint8_t tag_number, BACNET_ADDRESS *destination);
 
+BACNET_STACK_EXPORT
+int bacnet_address_binding_entry_encode(
+    uint8_t *apdu, uint32_t device_id, const BACNET_ADDRESS *address);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

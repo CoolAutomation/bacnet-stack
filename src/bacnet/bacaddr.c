@@ -415,3 +415,29 @@ int decode_context_bacnet_address(
 {
     return bacnet_address_context_decode(apdu, MAX_APDU, tag_number, value);
 }
+
+/**
+ * @brief Encode the BACnetAddressBinding entry
+ * @param apdu  Pointer to the APDU, or NULL for length calculation.
+ * @param device_id  Device ID to encode.
+ * @param address  Pointer to the BACnet address to encode.
+ * @return Count of encoded bytes.
+ */
+int bacnet_address_binding_entry_encode(
+    uint8_t *apdu, uint32_t device_id, const BACNET_ADDRESS *address)
+{
+    int len = 0, apdu_len = 0;
+
+    if (!address) {
+        return 0;
+    }
+    len = encode_application_object_id(apdu, OBJECT_DEVICE, device_id);
+    apdu_len += len;
+    if (apdu) {
+        apdu += len;
+    }
+    len = encode_bacnet_address(apdu, address);
+    apdu_len += len;
+
+    return apdu_len;
+}
