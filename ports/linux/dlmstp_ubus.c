@@ -31,7 +31,7 @@
 #include "bacnet/basic/sys/log.h"
 
 /* count must be a power of 2 for ringbuf library */
-#define MSTP_RX_QUEUE_SIZE 8
+#define MSTP_RX_QUEUE_SIZE 32
 static DLMSTP_PACKET RX_Buffer[MSTP_RX_QUEUE_SIZE];
 static RING_BUFFER RX_Queue;
 
