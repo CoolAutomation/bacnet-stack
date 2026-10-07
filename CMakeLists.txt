@@ -701,7 +701,8 @@ elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
   set(BACNET_PORT_DIRECTORY_PATH ${CMAKE_CURRENT_LIST_DIR}/ports/linux)
   find_library(UBUS_LIB NAMES ubus REQUIRED)
   find_library(UBOX_LIB NAMES ubox REQUIRED)
-  target_link_libraries(${PROJECT_NAME} PUBLIC m ubus ubox)
+  find_library(UCI_LIB NAMES uci REQUIRED)
+  target_link_libraries(${PROJECT_NAME} PUBLIC m ubus ubox uci)
   add_compile_definitions(BACNET_PORT=linux)
 
   target_sources(${PROJECT_NAME} PRIVATE

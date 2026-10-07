@@ -10,6 +10,8 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <inttypes.h>
+#include <uci.h>
 /* BACnet Stack defines - first */
 #include "bacnet/bacdef.h"
 /* BACnet Stack API */
@@ -358,118 +360,8 @@ int dlenv_register_as_foreign_device(void)
 }
 
 #if (BACNET_PROTOCOL_REVISION >= 17)
-#if defined(BACDL_BIP)
-/**
- * Datalink network port object settings
- */
-void dlenv_network_port_init(void)
-{
-    const uint32_t instance = 1;
-    BACNET_IP_ADDRESS addr = { 0 };
-    uint8_t prefix = 0;
-#if BBMD_ENABLED
-    uint8_t addr0, addr1, addr2, addr3;
-#endif
 
-    Network_Port_Object_Instance_Number_Set(0, instance);
-    Network_Port_Name_Set(instance, "BACnet/IP Port");
-    Network_Port_Type_Set(instance, PORT_TYPE_BIP);
-    bip_get_addr(&addr);
-    prefix = bip_get_subnet_prefix();
-    if (BIP_DL_Debug) {
-        fprintf(
-            stderr, "BIP: Setting Network Port %lu address %u.%u.%u.%u:%u/%u\n",
-            (unsigned long)instance, (unsigned)addr.address[0],
-            (unsigned)addr.address[1], (unsigned)addr.address[2],
-            (unsigned)addr.address[3], (unsigned)addr.port, (unsigned)prefix);
-    }
-    Network_Port_BIP_Port_Set(instance, addr.port);
-    Network_Port_IP_Address_Set(
-        instance, addr.address[0], addr.address[1], addr.address[2],
-        addr.address[3]);
-    Network_Port_IP_Subnet_Prefix_Set(instance, prefix);
-    Network_Port_Link_Speed_Set(instance, 0.0);
-#if BBMD_ENABLED
-    Network_Port_BBMD_BD_Table_Set(instance, bvlc_bdt_list());
-    Network_Port_BBMD_FD_Table_Set(instance, bvlc_fdt_list());
-    /* foreign device registration */
-    bvlc_address_get(&BBMD_Address, &addr0, &addr1, &addr2, &addr3);
-    Network_Port_Remote_BBMD_IP_Address_Set(
-        instance, addr0, addr1, addr2, addr3);
-    Network_Port_Remote_BBMD_BIP_Port_Set(instance, BBMD_Address.port);
-    Network_Port_Remote_BBMD_BIP_Lifetime_Set(instance, BBMD_TTL_Seconds);
-#endif
-    /* common NP data */
-    Network_Port_Reliability_Set(instance, RELIABILITY_NO_FAULT_DETECTED);
-    Network_Port_Out_Of_Service_Set(instance, false);
-    Network_Port_Quality_Set(instance, PORT_QUALITY_UNKNOWN);
-    Network_Port_APDU_Length_Set(instance, MAX_APDU);
-    Network_Port_Network_Number_Set(instance, 0);
-    /* last thing - clear pending changes - we don't want to set these
-       since they are already set */
-    Network_Port_Changes_Pending_Set(instance, false);
-}
-#elif defined(BACDL_MSTP)
-/**
- * Datalink network port object settings
- */
-void dlenv_network_port_init(void)
-{
-    uint32_t instance = 1;
-    uint8_t mac[1] = { 0 };
-
-    Network_Port_Object_Instance_Number_Set(0, instance);
-    Network_Port_Name_Set(instance, "MS/TP Port");
-    Network_Port_Type_Set(instance, PORT_TYPE_MSTP);
-    Network_Port_MSTP_Max_Master_Set(instance, dlmstp_max_master());
-    Network_Port_MSTP_Max_Info_Frames_Set(instance, dlmstp_max_info_frames());
-    Network_Port_Link_Speed_Set(instance, dlmstp_baud_rate());
-    mac[0] = dlmstp_mac_address();
-    Network_Port_MAC_Address_Set(instance, &mac[0], 1);
-    /* common NP data */
-    Network_Port_Reliability_Set(instance, RELIABILITY_NO_FAULT_DETECTED);
-    Network_Port_Out_Of_Service_Set(instance, false);
-    Network_Port_Quality_Set(instance, PORT_QUALITY_UNKNOWN);
-    Network_Port_APDU_Length_Set(instance, MAX_APDU);
-    Network_Port_Network_Number_Set(instance, 0);
-    /* last thing - clear pending changes - we don't want to set these
-       since they are already set */
-    Network_Port_Changes_Pending_Set(instance, false);
-}
-#elif defined(BACDL_BIP6)
-/**
- * Datalink network port object settings
- */
-void dlenv_network_port_init(void)
-{
-    uint32_t instance = 1;
-    uint8_t prefix = 0;
-    BACNET_ADDRESS addr = { 0 };
-    BACNET_IP6_ADDRESS addr6 = { 0 };
-
-    Network_Port_Object_Instance_Number_Set(0, instance);
-    Network_Port_Name_Set(instance, "BACnet/IPv6 Port");
-    Network_Port_Type_Set(instance, PORT_TYPE_BIP6);
-    Network_Port_BIP6_Port_Set(instance, bip6_get_port());
-    bip6_get_my_address(&addr);
-    Network_Port_MAC_Address_Set(instance, &addr.mac[0], addr.mac_len);
-    bip6_get_addr(&addr6);
-    Network_Port_IPv6_Address_Set(instance, &addr6.address[0]);
-    bip6_get_broadcast_addr(&addr6);
-    Network_Port_IPv6_Multicast_Address_Set(instance, &addr6.address[0]);
-    Network_Port_IPv6_Subnet_Prefix_Set(instance, prefix);
-
-    Network_Port_Reliability_Set(instance, RELIABILITY_NO_FAULT_DETECTED);
-    Network_Port_Link_Speed_Set(instance, 0.0);
-    Network_Port_Out_Of_Service_Set(instance, false);
-    Network_Port_Quality_Set(instance, PORT_QUALITY_UNKNOWN);
-    Network_Port_APDU_Length_Set(instance, MAX_APDU);
-    Network_Port_Network_Number_Set(instance, 0);
-    /* last thing - clear pending changes - we don't want to set these
-       since they are already set */
-    Network_Port_Changes_Pending_Set(instance, false);
-}
-#elif defined(BACDL_BSC)
+#if defined(BACDL_BSC)
 /**
  * @brief Datalink network port object settings
  * @param primary_hub_uri
@@ -626,31 +518,154 @@ static bool dlenv_hub_connection_status_check(void)
 
     return false;
 }
+#endif
 
-/**
- * Datalink network port object settings for BACnet/SC
- */
-void dlenv_network_port_init(void)
-{
-    /* if a user has configured BACnet/SC port with primary hub URI,     */
-    /* wait for a establishin of a connection to BACnet/SC hub at first  */
-    /* to reduce possibility of packet losses.                           */
-    if (Network_Port_SC_Primary_Hub_URI_char(1)) {
-        while (!dlenv_hub_connection_status_check()) {
-            bsc_wait(1);
-            bsc_maintenance_timer(1);
-        }
-    }
-}
-#else
 /**
  * Datalink network port object settings
  */
-void dlenv_network_port_init(void)
+void dlenv_network_port_init(DATALINK_TYPE datalink)
 {
-    /* do nothing */
-}
+#if defined(BACDL_BIP)
+    if (datalink == DATALINK_BIP) {
+        const uint32_t instance = 1;
+        BACNET_IP_ADDRESS addr = { 0 };
+        uint8_t prefix = 0;
+        const char *pEnv;
+        bool dhcp_enabled;
+        int i, idx;
+        unsigned int addr0, addr1, addr2, addr3;
+
+        Network_Port_Object_Instance_Number_Set(0, instance);
+        Network_Port_Name_Set(instance, "BACnet/IP Port");
+        Network_Port_Type_Set(instance, PORT_TYPE_BIP);
+        bip_get_addr(&addr);
+        prefix = bip_get_subnet_prefix();
+        if (BIP_DL_Debug) {
+            fprintf(
+                stderr, "BIP: Setting Network Port %lu address %u.%u.%u.%u:%u/%u\n",
+                (unsigned long)instance, (unsigned)addr.address[0],
+                (unsigned)addr.address[1], (unsigned)addr.address[2],
+                (unsigned)addr.address[3], (unsigned)addr.port, (unsigned)prefix);
+        }
+        Network_Port_BIP_Port_Set(instance, addr.port);
+        Network_Port_IP_Address_Set(
+            instance, addr.address[0], addr.address[1], addr.address[2],
+            addr.address[3]);
+        Network_Port_IP_Subnet_Prefix_Set(instance, prefix);
+        Network_Port_Link_Speed_Set(instance, 0.0);
+
+        pEnv = getenv("BACNET_NET_PROTO");
+        dhcp_enabled = pEnv && !strcmp(pEnv, "dhcp");
+        Network_Port_IP_DHCP_Enable_Set(instance, dhcp_enabled);
+
+        pEnv = getenv("BACNET_NET_GATEWAY");
+        sscanf(pEnv, "%u.%u.%u.%u",
+               &addr0, &addr1,&addr2, &addr3);
+        Network_Port_IP_Gateway_Set(instance, addr0, addr1, addr2, addr3);
+
+        pEnv = getenv("BACNET_NET_DNS");
+        idx = 0;
+        i = 0;
+        do {
+            if (sscanf(pEnv + idx, "%u.%u.%u.%u%n",
+                       &addr0, &addr1,&addr2, &addr3, &idx) < 4)
+                break;
+        } while (Network_Port_IP_DNS_Server_Set(instance, i++,
+                                                addr0, addr1, addr2, addr3));
+#if BBMD_ENABLED
+        Network_Port_BBMD_BD_Table_Set(instance, bvlc_bdt_list());
+        Network_Port_BBMD_FD_Table_Set(instance, bvlc_fdt_list());
 #endif
+#if (BBMD_ENABLED || BBMD_CLIENT_ENABLED)
+        /* foreign device registration */
+        bvlc_address_get(&BBMD_Address, &addr0, &addr1, &addr2, &addr3);
+        Network_Port_Remote_BBMD_IP_Address_Set(
+            instance, addr0, addr1, addr2, addr3);
+        Network_Port_Remote_BBMD_BIP_Port_Set(instance, BBMD_Address.port);
+        Network_Port_Remote_BBMD_BIP_Lifetime_Set(instance, BBMD_TTL_Seconds);
+        Network_Port_BIP_Mode_Set(instance,
+                                  BBMD_Address_Valid ?
+                                  BACNET_IP_MODE_FOREIGN : BACNET_IP_MODE_NORMAL);
+#endif
+        /* common NP data */
+        Network_Port_Reliability_Set(instance, RELIABILITY_NO_FAULT_DETECTED);
+        Network_Port_Out_Of_Service_Set(instance, false);
+        Network_Port_Quality_Set(instance, PORT_QUALITY_UNKNOWN);
+        Network_Port_APDU_Length_Set(instance, MAX_APDU);
+        Network_Port_Network_Number_Set(instance, 0);
+        /* last thing - clear pending changes - we don't want to set these
+           since they are already set */
+        Network_Port_Changes_Pending_Set(instance, false);
+    }
+#endif
+#if defined(BACDL_MSTP)
+    if (datalink == DATALINK_MSTP) {
+        uint32_t instance = 1;
+        uint8_t mac[1] = { 0 };
+
+        Network_Port_Object_Instance_Number_Set(0, instance);
+        Network_Port_Name_Set(instance, "MS/TP Port");
+        Network_Port_Type_Set(instance, PORT_TYPE_MSTP);
+        Network_Port_MSTP_Max_Master_Set(instance, dlmstp_max_master());
+        Network_Port_MSTP_Max_Info_Frames_Set(instance, dlmstp_max_info_frames());
+        Network_Port_Link_Speed_Set(instance, dlmstp_baud_rate());
+        mac[0] = dlmstp_mac_address();
+        Network_Port_MAC_Address_Set(instance, &mac[0], 1);
+        /* common NP data */
+        Network_Port_Reliability_Set(instance, RELIABILITY_NO_FAULT_DETECTED);
+        Network_Port_Out_Of_Service_Set(instance, false);
+        Network_Port_Quality_Set(instance, PORT_QUALITY_UNKNOWN);
+        Network_Port_APDU_Length_Set(instance, MAX_APDU);
+        Network_Port_Network_Number_Set(instance, 0);
+        /* last thing - clear pending changes - we don't want to set these
+           since they are already set */
+        Network_Port_Changes_Pending_Set(instance, false);
+    }
+#endif
+#if defined(BACDL_BIP6)
+    if (datalink == DATALINK_BIP6) {
+        uint32_t instance = 1;
+        uint8_t prefix = 0;
+        BACNET_ADDRESS addr = { 0 };
+        BACNET_IP6_ADDRESS addr6 = { 0 };
+
+        Network_Port_Object_Instance_Number_Set(0, instance);
+        Network_Port_Name_Set(instance, "BACnet/IPv6 Port");
+        Network_Port_Type_Set(instance, PORT_TYPE_BIP6);
+        Network_Port_BIP6_Port_Set(instance, bip6_get_port());
+        bip6_get_my_address(&addr);
+        Network_Port_MAC_Address_Set(instance, &addr.mac[0], addr.mac_len);
+        bip6_get_addr(&addr6);
+        Network_Port_IPv6_Address_Set(instance, &addr6.address[0]);
+        bip6_get_broadcast_addr(&addr6);
+        Network_Port_IPv6_Multicast_Address_Set(instance, &addr6.address[0]);
+        Network_Port_IPv6_Subnet_Prefix_Set(instance, prefix);
+
+        Network_Port_Reliability_Set(instance, RELIABILITY_NO_FAULT_DETECTED);
+        Network_Port_Link_Speed_Set(instance, 0.0);
+        Network_Port_Out_Of_Service_Set(instance, false);
+        Network_Port_Quality_Set(instance, PORT_QUALITY_UNKNOWN);
+        Network_Port_APDU_Length_Set(instance, MAX_APDU);
+        Network_Port_Network_Number_Set(instance, 0);
+        /* last thing - clear pending changes - we don't want to set these
+           since they are already set */
+        Network_Port_Changes_Pending_Set(instance, false);
+    }
+#endif
+#if defined(BACDL_BSC)
+    if (datalink == DATALINK_BSC) {
+        /* if a user has configured BACnet/SC port with primary hub URI,     */
+        /* wait for a establishin of a connection to BACnet/SC hub at first  */
+        /* to reduce possibility of packet losses.                           */
+        if (Network_Port_SC_Primary_Hub_URI_char(1)) {
+            while (!dlenv_hub_connection_status_check()) {
+                bsc_wait(1);
+                bsc_maintenance_timer(1);
+            }
+        }
+    }
+#endif
+}
 #endif
 
 /** Datalink maintenance timer
@@ -845,29 +860,63 @@ void dlenv_init(void)
     }
 #endif
 #if defined(BACDL_MSTP)
-    pEnv = getenv("BACNET_MAX_INFO_FRAMES");
-    if (pEnv) {
-        dlmstp_set_max_info_frames(strtol(pEnv, NULL, 0));
-    } else {
-        dlmstp_set_max_info_frames(1);
+    int rc;
+    char *iface;
+    unsigned int ldi, ln = 0;
+    struct uci_element *e;
+    struct uci_context *uci_ctx = NULL;
+    struct uci_package *liner_package = NULL;
+
+    if (!uci_ctx)
+        uci_ctx = uci_alloc_context();
+
+    if (!uci_ctx) {
+        perror( "uci alloc failed" );
+        exit(-1);
     }
-    pEnv = getenv("BACNET_MAX_MASTER");
-    if (pEnv) {
-        dlmstp_set_max_master(strtol(pEnv, NULL, 0));
-    } else {
-        dlmstp_set_max_master(127);
+
+    rc = uci_load(uci_ctx, "hvac-lines", &liner_package);
+    if (rc != 0) {
+        perror("Can't load hvac-lines config file");
+        exit(-1);
     }
-    pEnv = getenv("BACNET_MSTP_BAUD");
-    if (pEnv) {
-        dlmstp_set_baud_rate(strtol(pEnv, NULL, 0));
-    } else {
-        dlmstp_set_baud_rate(38400);
-    }
-    pEnv = getenv("BACNET_MSTP_MAC");
-    if (pEnv) {
-        dlmstp_set_mac_address(strtol(pEnv, NULL, 0));
-    } else {
-        dlmstp_set_mac_address(127);
+
+    iface = getenv("BACNET_IFACE");
+    sscanf(iface, "ubev%d", &ln);
+    if (ln != 0) {
+        printf("want line %d\n", ln);
+        uci_foreach_element(&liner_package->sections, e) {
+            struct uci_section *s = uci_to_section(e);
+            printf("reading section %s\n", s->e.name);
+            if (sscanf(s->e.name, "L%X", &ldi) && ldi == ln) {
+                unsigned int baud = 9600;
+                unsigned int myid = 0;
+                unsigned int max_master = 127;
+                unsigned int max_info_frames = 7;
+
+                uci_foreach_element(&s->options, e) {
+                    struct uci_option *o = uci_to_option(e);
+
+                    if (o->type == UCI_TYPE_STRING) {
+                        if (!strcmp(o->e.name, "myid")) {
+                            sscanf(o->v.string, "%x", &myid);
+                            dlmstp_set_mac_address(myid);
+                        } else if (!strcmp(o->e.name, "baud")) {
+                            sscanf(o->v.string, "%u", &baud);
+                        } else if (!strcmp(o->e.name, "max_manager")) {
+                            sscanf(o->v.string, "%u", &max_master);
+                        } else if (!strcmp(o->e.name, "max_info_frames")) {
+                            sscanf(o->v.string, "%u", &max_info_frames);
+                        }
+                    }
+                }
+
+                dlmstp_set_baud_rate(baud);
+                dlmstp_set_max_master(max_master);
+                dlmstp_set_max_info_frames(max_info_frames);
+                break;
+            }
+        }
     }
 #elif defined(BACDL_BSC)
     char *primary_hub_uri;
@@ -921,8 +970,8 @@ void dlenv_init(void)
         tsm_invokeID_set((uint8_t)strtol(pEnv, NULL, 0));
     }
 #endif
-#if (BACNET_PROTOCOL_REVISION >= 17)
-    dlenv_network_port_init();
-#endif
     dlenv_register_as_foreign_device();
+#if (BACNET_PROTOCOL_REVISION >= 17)
+    dlenv_network_port_init(datalink_get());
+#endif
 }

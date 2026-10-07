@@ -34,7 +34,7 @@ int dlenv_register_as_foreign_device(void);
 
 #if (BACNET_PROTOCOL_REVISION >= 17)
 BACNET_STACK_EXPORT
-void dlenv_network_port_init(void);
+void dlenv_network_port_init(DATALINK_TYPE datalink);
 #endif
 
 BACNET_STACK_EXPORT
