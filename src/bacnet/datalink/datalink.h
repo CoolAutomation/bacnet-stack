@@ -121,6 +121,16 @@ void routed_get_my_address(BACNET_ADDRESS *my_address);
 #define MAX_HEADER (8)
 #define MAX_MPDU (MAX_HEADER + MAX_PDU)
 
+typedef enum {
+    DATALINK_NONE = 0,
+    DATALINK_ARCNET,
+    DATALINK_ETHERNET,
+    DATALINK_BIP,
+    DATALINK_BIP6,
+    DATALINK_MSTP,
+    DATALINK_BSC
+} DATALINK_TYPE;
+
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
@@ -153,6 +163,9 @@ void datalink_set_interface(char *ifname);
 
 BACNET_STACK_EXPORT
 void datalink_set(char *datalink_string);
+
+BACNET_STACK_EXPORT
+DATALINK_TYPE datalink_get(void);
 
 BACNET_STACK_EXPORT
 void datalink_maintenance_timer(uint16_t seconds);

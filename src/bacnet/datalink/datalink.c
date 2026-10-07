@@ -36,15 +36,7 @@
 #include <strings.h> /* for strcasecmp() */
 #endif
 
-static enum {
-    DATALINK_NONE = 0,
-    DATALINK_ARCNET,
-    DATALINK_ETHERNET,
-    DATALINK_BIP,
-    DATALINK_BIP6,
-    DATALINK_MSTP,
-    DATALINK_BSC
-} Datalink_Transport;
+static DATALINK_TYPE Datalink_Transport;
 
 void datalink_set(char *datalink_string)
 {
@@ -81,6 +73,11 @@ void datalink_set(char *datalink_string)
         Datalink_Transport = DATALINK_BSC;
     }
 #endif
+}
+
+DATALINK_TYPE datalink_get(void)
+{
+    return Datalink_Transport;
 }
 
 bool datalink_init(char *ifname)
